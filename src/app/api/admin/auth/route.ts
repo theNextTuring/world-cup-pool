@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { ADMIN_COOKIE, getAdminSecret } from "@/lib/admin";
+import {
+  ADMIN_COOKIE,
+  adminCookieOptions,
+  getAdminSecret,
+  signAdminToken,
+} from "@/lib/admin";
 
 export async function POST(request: Request) {
   try {
@@ -11,13 +16,7 @@ export async function POST(request: Request) {
     }
 
     const response = NextResponse.json({ ok: true });
-    response.cookies.set(ADMIN_COOKIE, secret, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    response.cookies.set(ADMIN_COOKIE, await signAdminToken(), adminCookieOptions());
     return response;
   } catch (error) {
     return NextResponse.json(

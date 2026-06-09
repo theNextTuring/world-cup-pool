@@ -39,6 +39,19 @@ const ROUND_OPTIONS = [
   { value: "final", label: "Final" },
 ] as const;
 
+const ROUND_REQUIREMENTS: Record<KnockoutMatch["round"], number> = {
+  r32: 16,
+  r16: 8,
+  qf: 4,
+  sf: 2,
+  final: 1,
+};
+
+const EXPECTED_BRACKET_MATCHES = Object.values(ROUND_REQUIREMENTS).reduce(
+  (total, count) => total + count,
+  0,
+);
+
 function defaultStandings(): Record<string, string[]> {
   const map: Record<string, string[]> = {};
   for (const group of GROUPS) {
@@ -70,6 +83,32 @@ export default function AdminPage() {
     () => GROUPS.flatMap((g) => g.teams.map((t) => t.slug)),
     [],
   );
+
+  const bracketErrors = useMemo(() => {
+    const errors: string[] = [];
+    if (matches.length !== EXPECTED_BRACKET_MATCHES) {
+      errors.push(`${matches.length}/${EXPECTED_BRACKET_MATCHES} matches drafted`);
+    }
+
+    for (const { value, label } of ROUND_OPTIONS) {
+      const roundMatches = matches.filter((match) => match.round === value);
+      const requiredCount = ROUND_REQUIREMENTS[value];
+      if (roundMatches.length !== requiredCount) {
+        errors.push(`${label}: ${roundMatches.length}/${requiredCount}`);
+      }
+
+      const matchNumbers = new Set(
+        roundMatches.map((match) => match.match_number),
+      );
+      if (matchNumbers.size !== roundMatches.length) {
+        errors.push(`${label}: duplicate match numbers`);
+      }
+    }
+
+    return errors;
+  }, [matches]);
+
+  const bracketComplete = bracketErrors.length === 0;
 
   async function login() {
     setLoading(true);
@@ -163,6 +202,13 @@ export default function AdminPage() {
 
   async function saveSettings(partial: Partial<AppSettings>) {
     if (!settings) return;
+    const wantsToPublish =
+      partial.knockout_bracket_published ?? settings.knockout_bracket_published;
+    if (wantsToPublish && !bracketComplete) {
+      setMessage("Complete and save all 31 knockout matches before publishing.");
+      return;
+    }
+
     const response = await fetch("/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -242,6 +288,11 @@ export default function AdminPage() {
   }
 
   async function saveBracket() {
+    if (!bracketComplete) {
+      setMessage(`Bracket is incomplete: ${bracketErrors.join("; ")}`);
+      return;
+    }
+
     const response = await fetch("/api/admin/bracket", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -425,12 +476,18 @@ export default function AdminPage() {
             <input
               type="checkbox"
               checked={settings.knockout_bracket_published}
-              onChange={(e) =>
+              onChange={(e) => {
+                if (e.target.checked && !bracketComplete) {
+                  setMessage(
+                    "Complete and save all 31 knockout matches before publishing.",
+                  );
+                  return;
+                }
                 setSettings({
                   ...settings,
                   knockout_bracket_published: e.target.checked,
-                })
-              }
+                });
+              }}
             />
             Publish knockout bracket
           </label>
@@ -501,8 +558,24 @@ export default function AdminPage() {
         <h2 className="text-lg font-semibold">Knockout Bracket Builder</h2>
         <p className="text-sm text-zinc-500">
           Add matches, save the full bracket, then enter winners as results come
-          in. ({matches.length} matches drafted)
+          in. ({matches.length}/{EXPECTED_BRACKET_MATCHES} matches drafted)
         </p>
+        <div
+          className={`rounded-xl border px-3 py-2 text-sm ${
+            bracketComplete
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+          }`}
+        >
+          {bracketComplete ? (
+            <p>Bracket is complete and ready to save/publish.</p>
+          ) : (
+            <div className="space-y-1">
+              <p className="font-medium">Bracket must be complete before save/publish:</p>
+              <p>{bracketErrors.join(" · ")}</p>
+            </div>
+          )}
+        </div>
 
         <div className="grid gap-2 md:grid-cols-5">
           <select
@@ -611,7 +684,8 @@ export default function AdminPage() {
         <button
           type="button"
           onClick={saveBracket}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+          disabled={!bracketComplete}
+          className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
         >
           Save bracket to database
         </button>

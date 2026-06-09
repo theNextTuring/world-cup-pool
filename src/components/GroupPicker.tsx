@@ -24,10 +24,18 @@ function SortableTeam({
   team,
   position,
   disabled,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
 }: {
   team: Team;
   position: number;
   disabled: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: team.slug, disabled });
@@ -41,7 +49,7 @@ function SortableTeam({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+      className={`flex items-center gap-3 rounded-xl border px-3 py-3 sm:px-4 ${
         isDragging
           ? "border-emerald-400 bg-emerald-50 shadow-md dark:bg-emerald-950/30"
           : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
@@ -51,17 +59,37 @@ function SortableTeam({
         {position}
       </span>
       <TeamFlag slug={team.slug} size={28} />
-      <span className="flex-1 font-medium">{team.name}</span>
+      <span className="min-w-0 flex-1 font-medium">{team.name}</span>
       {!disabled && (
-        <button
-          type="button"
-          className="cursor-grab rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 active:cursor-grabbing dark:hover:bg-zinc-800"
-          aria-label={`Drag to reorder ${team.name}`}
-          {...attributes}
-          {...listeners}
-        >
-          Drag
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={!canMoveUp}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 text-base font-semibold text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:hidden"
+            aria-label={`Move ${team.name} up`}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={!canMoveDown}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 text-base font-semibold text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:hidden"
+            aria-label={`Move ${team.name} down`}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className="hidden cursor-grab rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 active:cursor-grabbing dark:hover:bg-zinc-800 sm:block"
+            aria-label={`Drag to reorder ${team.name}`}
+            {...attributes}
+            {...listeners}
+          >
+            Drag
+          </button>
+        </div>
       )}
     </div>
   );
@@ -104,6 +132,12 @@ export function GroupPicker({
     onChange(arrayMove(ranking, oldIndex, newIndex));
   }
 
+  function moveTeam(index: number, direction: -1 | 1) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= ranking.length) return;
+    onChange(arrayMove(ranking, index, newIndex));
+  }
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -134,6 +168,10 @@ export function GroupPicker({
                 team={team}
                 position={index + 1}
                 disabled={locked}
+                canMoveUp={index > 0}
+                canMoveDown={index < orderedTeams.length - 1}
+                onMoveUp={() => moveTeam(index, -1)}
+                onMoveDown={() => moveTeam(index, 1)}
               />
             ))}
           </div>

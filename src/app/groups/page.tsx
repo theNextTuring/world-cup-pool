@@ -128,6 +128,11 @@ export default function GroupsPage() {
 
   function handleChange(groupCode: string, ranking: string[]) {
     setRankings((prev) => ({ ...prev, [groupCode]: ranking }));
+    setSavedGroups((prev) => {
+      const next = new Set(prev);
+      next.delete(groupCode);
+      return next;
+    });
     scheduleSave(groupCode, ranking);
   }
 
@@ -167,8 +172,8 @@ export default function GroupsPage() {
         <div>
           <h1 className="text-2xl font-bold">Group Stage Picks</h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Drag teams to rank 1st through 4th in each group. Changes auto-save
-            when you reorder.
+            On phones, use ↑ and ↓ to rank teams. On desktop, drag teams into
+            order. Changes auto-save when you reorder.
             {entryName && (
               <span className="ml-2 font-medium">Entry: {entryName}</span>
             )}
@@ -211,8 +216,8 @@ export default function GroupsPage() {
       </div>
 
       {!locked && (
-        <div className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
+        <div className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               {allSaved
                 ? "All 12 groups saved."
@@ -222,7 +227,7 @@ export default function GroupsPage() {
               type="button"
               onClick={submitAll}
               disabled={submitting}
-              className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
+              className="w-full rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60 sm:w-auto sm:py-2.5"
             >
               {submitting ? "Submitting…" : "Submit all picks"}
             </button>

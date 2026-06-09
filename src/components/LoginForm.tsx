@@ -28,6 +28,7 @@ export function LoginForm() {
         throw new Error(data.error ?? "Failed to log in");
       }
 
+      window.dispatchEvent(new Event("pool-auth-changed"));
       router.push("/groups");
       router.refresh();
     } catch (err) {

@@ -35,6 +35,7 @@ export function SignupForm() {
         throw new Error(data.error ?? "Failed to sign up");
       }
 
+      window.dispatchEvent(new Event("pool-auth-changed"));
       router.push("/groups");
       router.refresh();
     } catch (err) {

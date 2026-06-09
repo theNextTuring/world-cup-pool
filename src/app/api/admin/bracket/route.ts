@@ -4,6 +4,13 @@ import type { KnockoutRound } from "@/lib/supabase";
 import { createServiceClient } from "@/lib/supabase";
 
 const VALID_ROUNDS: KnockoutRound[] = ["r32", "r16", "qf", "sf", "final"];
+const ROUND_REQUIREMENTS: Record<KnockoutRound, number> = {
+  r32: 16,
+  r16: 8,
+  qf: 4,
+  sf: 2,
+  final: 1,
+};
 
 export async function GET() {
   if (!(await isAdminAuthenticated())) return adminUnauthorized();
@@ -40,24 +47,80 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No matches provided" }, { status: 400 });
     }
 
-    const rows = matches.map((match: Record<string, unknown>, index: number) => {
+    const expectedTotal = Object.values(ROUND_REQUIREMENTS).reduce(
+      (total, count) => total + count,
+      0,
+    );
+
+    if (matches.length !== expectedTotal) {
+      return NextResponse.json(
+        { error: `A complete bracket must have ${expectedTotal} matches` },
+        { status: 400 },
+      );
+    }
+
+    const rows = [];
+    for (const [index, match] of matches.entries() as IterableIterator<
+      [number, Record<string, unknown>]
+    >) {
       const round = String(match.round ?? "") as KnockoutRound;
       if (!VALID_ROUNDS.includes(round)) {
-        throw new Error(`Invalid round at index ${index}`);
+        return NextResponse.json(
+          { error: `Invalid round at index ${index}` },
+          { status: 400 },
+        );
+      }
+      const matchNumber = Number(match.matchNumber ?? index + 1);
+      if (!Number.isInteger(matchNumber) || matchNumber < 1) {
+        return NextResponse.json(
+          { error: `Invalid match number at index ${index}` },
+          { status: 400 },
+        );
       }
       const teamA = String(match.teamA ?? "");
       const teamB = String(match.teamB ?? "");
       if (!teamA || !teamB || teamA === teamB) {
-        throw new Error(`Invalid teams at index ${index}`);
+        return NextResponse.json(
+          { error: `Invalid teams at index ${index}` },
+          { status: 400 },
+        );
       }
-      return {
+      const winner = match.winner ? String(match.winner) : null;
+      if (winner && winner !== teamA && winner !== teamB) {
+        return NextResponse.json(
+          { error: `Invalid winner at index ${index}` },
+          { status: 400 },
+        );
+      }
+      rows.push({
         round,
-        match_number: Number(match.matchNumber ?? index + 1),
+        match_number: matchNumber,
         team_a: teamA,
         team_b: teamB,
-        winner: match.winner ? String(match.winner) : null,
-      };
-    });
+        winner,
+      });
+    }
+
+    for (const round of VALID_ROUNDS) {
+      const roundRows = rows.filter((row) => row.round === round);
+      const requiredCount = ROUND_REQUIREMENTS[round];
+      if (roundRows.length !== requiredCount) {
+        return NextResponse.json(
+          {
+            error: `${round.toUpperCase()} must have ${requiredCount} matches`,
+          },
+          { status: 400 },
+        );
+      }
+
+      const matchNumbers = new Set(roundRows.map((row) => row.match_number));
+      if (matchNumbers.size !== roundRows.length) {
+        return NextResponse.json(
+          { error: `${round.toUpperCase()} match numbers must be unique` },
+          { status: 400 },
+        );
+      }
+    }
 
     const supabase = createServiceClient();
     const { error: deleteError } = await supabase
