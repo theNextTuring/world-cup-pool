@@ -3,7 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDeadlineET } from "@/lib/dates";
 import type { KnockoutMatch } from "@/lib/supabase";
+import { TeamLabel } from "@/components/TeamLabel";
 import { GROUPS, teamName, teamsForGroup } from "@/lib/teams";
+
+type PoolUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  entryName: string;
+  hasPassword: boolean;
+};
 
 type AppSettings = {
   group_deadline: string;
@@ -52,6 +61,10 @@ export default function AdminPage() {
   });
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<PoolUser[]>([]);
+  const [resetPasswords, setResetPasswords] = useState<Record<string, string>>(
+    {},
+  );
 
   const allTeamSlugs = useMemo(
     () => GROUPS.flatMap((g) => g.teams.map((t) => t.slug)),
@@ -80,10 +93,11 @@ export default function AdminPage() {
   }
 
   async function loadAdminData() {
-    const [settingsRes, standingsRes, bracketRes] = await Promise.all([
+    const [settingsRes, standingsRes, bracketRes, usersRes] = await Promise.all([
       fetch("/api/admin/settings"),
       fetch("/api/admin/standings"),
       fetch("/api/admin/bracket"),
+      fetch("/api/admin/users"),
     ]);
 
     if (settingsRes.ok) {
@@ -108,6 +122,32 @@ export default function AdminPage() {
     if (bracketRes.ok) {
       const data = await bracketRes.json();
       setMatches(data.matches ?? []);
+    }
+
+    if (usersRes.ok) {
+      const data = await usersRes.json();
+      setUsers(data.users ?? []);
+    }
+  }
+
+  async function resetUserPassword(userId: string) {
+    const newPassword = resetPasswords[userId] ?? "";
+    if (!newPassword) {
+      setMessage("Enter a new password first");
+      return;
+    }
+
+    const response = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, newPassword }),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      setMessage(`Password reset for ${data.user.entryName}`);
+      setResetPasswords((prev) => ({ ...prev, [userId]: "" }));
+    } else {
+      setMessage(data.error ?? "Failed to reset password");
     }
   }
 
@@ -275,6 +315,54 @@ export default function AdminPage() {
         <h1 className="text-2xl font-bold">Admin Panel</h1>
         {message && <p className="text-sm text-emerald-600">{message}</p>}
       </div>
+
+      <section className="space-y-4 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
+        <h2 className="text-lg font-semibold">Reset User Passwords</h2>
+        <p className="text-sm text-zinc-500">
+          If someone forgets their password, set a new one here and share it
+          with them privately.
+        </p>
+        <div className="space-y-3">
+          {users.length === 0 && (
+            <p className="text-sm text-zinc-500">No users yet.</p>
+          )}
+          {users.map((user) => (
+            <div
+              key={user.id}
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 px-3 py-3 dark:border-zinc-700"
+            >
+              <div className="min-w-40 flex-1">
+                <p className="font-medium">
+                  {user.firstName} {user.lastName}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  {user.entryName}
+                  {!user.hasPassword && " · no password yet"}
+                </p>
+              </div>
+              <input
+                type="password"
+                placeholder="New password"
+                value={resetPasswords[user.id] ?? ""}
+                onChange={(e) =>
+                  setResetPasswords((prev) => ({
+                    ...prev,
+                    [user.id]: e.target.value,
+                  }))
+                }
+                className="w-40 rounded-lg border px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              />
+              <button
+                type="button"
+                onClick={() => resetUserPassword(user.id)}
+                className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white"
+              >
+                Reset
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="space-y-3 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
         <h2 className="text-lg font-semibold">Deadlines & Locks</h2>
@@ -488,8 +576,10 @@ export default function AdminPage() {
               <span className="font-medium">
                 {match.round.toUpperCase()} #{match.match_number}
               </span>
-              <span>
-                {teamName(match.team_a)} vs {teamName(match.team_b)}
+              <span className="flex flex-wrap items-center gap-2">
+                <TeamLabel slug={match.team_a} flagSize={18} />
+                <span className="text-zinc-400">vs</span>
+                <TeamLabel slug={match.team_b} flagSize={18} />
               </span>
               <select
                 className="rounded border px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"

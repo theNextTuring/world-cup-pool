@@ -1,7 +1,7 @@
 "use client";
 
 import type { KnockoutMatch } from "@/lib/supabase";
-import { teamName } from "@/lib/teams";
+import { TeamLabel } from "@/components/TeamLabel";
 
 const ROUND_LABELS: Record<KnockoutMatch["round"], string> = {
   r32: "Round of 32",
@@ -71,7 +71,7 @@ export function Bracket({
                               : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-500"
                           } ${locked ? "cursor-default opacity-80" : "cursor-pointer"}`}
                         >
-                          {teamName(slug)}
+                          <TeamLabel slug={slug} flagSize={22} />
                           {match.winner === slug && (
                             <span className="ml-2 text-xs text-emerald-600">
                               (actual)

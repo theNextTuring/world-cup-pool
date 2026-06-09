@@ -17,6 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { TeamFlag } from "@/components/TeamLabel";
 import type { Team } from "@/lib/teams";
 
 function SortableTeam({
@@ -49,6 +50,7 @@ function SortableTeam({
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold dark:bg-zinc-800">
         {position}
       </span>
+      <TeamFlag slug={team.slug} size={28} />
       <span className="flex-1 font-medium">{team.name}</span>
       {!disabled && (
         <button

@@ -76,6 +76,12 @@ export function Nav() {
               Log in
             </Link>
           )}
+          <Link
+            href="/admin"
+            className="rounded-lg px-3 py-1.5 text-sm text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+          >
+            Admin
+          </Link>
         </div>
       </div>
     </nav>
