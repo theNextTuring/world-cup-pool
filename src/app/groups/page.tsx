@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GroupPicker } from "@/components/GroupPicker";
 import { SaveIndicator } from "@/components/SaveIndicator";
-import { getStoredUserId } from "@/lib/client";
 import { formatDeadlineET } from "@/lib/dates";
 import { GROUPS } from "@/lib/teams";
 
@@ -12,7 +11,6 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 
 export default function GroupsPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState<string | null>(null);
   const [entryName, setEntryName] = useState("");
   const [rankings, setRankings] = useState<Record<string, string[]>>({});
   const [locked, setLocked] = useState(false);
@@ -31,27 +29,25 @@ export default function GroupsPage() {
   }, []);
 
   useEffect(() => {
-    const id = getStoredUserId();
-    if (!id) {
-      router.replace("/");
-      return;
-    }
-    setUserId(id);
-
     async function load() {
       try {
-        const [userRes, picksRes, settingsRes] = await Promise.all([
-          fetch(`/api/users?userId=${id}`),
-          fetch(`/api/picks/group?userId=${id}`),
+        const [meRes, picksRes, settingsRes] = await Promise.all([
+          fetch("/api/auth/me"),
+          fetch("/api/picks/group"),
           fetch("/api/settings"),
         ]);
 
-        const userData = await userRes.json();
+        if (meRes.status === 401) {
+          router.replace("/");
+          return;
+        }
+
+        const meData = await meRes.json();
         const picksData = await picksRes.json();
         const settingsData = await settingsRes.json();
 
-        if (userRes.ok) {
-          setEntryName(userData.user.entry_name);
+        if (meRes.ok) {
+          setEntryName(meData.user.entryName);
         }
 
         const merged = { ...initialRankings };
@@ -79,13 +75,13 @@ export default function GroupsPage() {
 
   const flushSave = useCallback(
     async (groupCode: string, ranking: string[]) => {
-      if (!userId || locked) return;
+      if (locked) return;
       setSaveState("saving");
       try {
         const response = await fetch("/api/picks/group", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, groupCode, ranking }),
+          body: JSON.stringify({ groupCode, ranking }),
         });
         if (!response.ok) {
           const data = await response.json();
@@ -96,7 +92,7 @@ export default function GroupsPage() {
         setSaveState("error");
       }
     },
-    [userId, locked],
+    [locked],
   );
 
   const scheduleSave = useCallback(

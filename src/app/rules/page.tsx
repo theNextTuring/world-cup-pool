@@ -14,9 +14,9 @@ export default function RulesPage() {
 
       <h2>How to enter</h2>
       <p>
-        Enter your first and last name on the home page. No password or account
-        is required. Your browser stores a unique ID so you can return and edit
-        picks on the same device.
+        Sign up on the home page with your first name, last name, and a
+        password. Log in with the same name and password on any device to access
+        your picks. Contact the pool admin if you forget your password.
       </p>
 
       <h2>Group stage picks</h2>

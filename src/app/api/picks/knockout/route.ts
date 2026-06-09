@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import { fetchSettings, getEffectiveLocks } from "@/lib/locks";
+import { getSessionUserId, unauthorized } from "@/lib/session";
 import { createServiceClient } from "@/lib/supabase";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId required" }, { status: 400 });
-    }
+    const userId = await getSessionUserId();
+    if (!userId) return unauthorized();
 
     const supabase = createServiceClient();
     const [picksRes, tiebreakerRes, matchesRes, settings] = await Promise.all([
@@ -45,12 +42,14 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const userId = await getSessionUserId();
+    if (!userId) return unauthorized();
+
     const body = await request.json();
-    const userId = String(body.userId ?? "");
     const matchId = String(body.matchId ?? "");
     const pickedWinner = String(body.pickedWinner ?? "");
 
-    if (!userId || !matchId || !pickedWinner) {
+    if (!matchId || !pickedWinner) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
@@ -86,16 +85,6 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Invalid winner pick" }, { status: 400 });
     }
 
-    const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .single();
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
     const { data, error } = await supabase
       .from("knockout_picks")
       .upsert(
@@ -128,11 +117,13 @@ export async function PUT(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const userId = await getSessionUserId();
+    if (!userId) return unauthorized();
+
     const body = await request.json();
-    const userId = String(body.userId ?? "");
     const totalGoals = Number(body.totalGoals);
 
-    if (!userId || !Number.isInteger(totalGoals) || totalGoals < 0) {
+    if (!Number.isInteger(totalGoals) || totalGoals < 0) {
       return NextResponse.json({ error: "Invalid tiebreaker" }, { status: 400 });
     }
 
@@ -152,16 +143,6 @@ export async function PATCH(request: Request) {
         { error: "Knockout picks are locked" },
         { status: 403 },
       );
-    }
-
-    const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .single();
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const { data, error } = await supabase

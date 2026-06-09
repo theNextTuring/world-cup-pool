@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bracket } from "@/components/Bracket";
 import { SaveIndicator } from "@/components/SaveIndicator";
-import { getStoredUserId } from "@/lib/client";
 import { formatDeadlineET } from "@/lib/dates";
 import type { KnockoutMatch } from "@/lib/supabase";
 
@@ -12,7 +11,6 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 
 export default function KnockoutPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState<string | null>(null);
   const [matches, setMatches] = useState<KnockoutMatch[]>([]);
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [tiebreaker, setTiebreaker] = useState("");
@@ -24,19 +22,19 @@ export default function KnockoutPage() {
   const tiebreakerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const id = getStoredUserId();
-    if (!id) {
-      router.replace("/");
-      return;
-    }
-    setUserId(id);
-
     async function load() {
       try {
-        const [dataRes, settingsRes] = await Promise.all([
-          fetch(`/api/picks/knockout?userId=${id}`),
+        const [meRes, dataRes, settingsRes] = await Promise.all([
+          fetch("/api/auth/me"),
+          fetch("/api/picks/knockout"),
           fetch("/api/settings"),
         ]);
+
+        if (meRes.status === 401) {
+          router.replace("/");
+          return;
+        }
+
         const data = await dataRes.json();
         const settingsData = await settingsRes.json();
 
@@ -46,9 +44,7 @@ export default function KnockoutPage() {
           pickMap[pick.match_id] = pick.picked_winner;
         }
         setPicks(pickMap);
-        setTiebreaker(
-          data.tiebreaker?.total_goals?.toString() ?? "",
-        );
+        setTiebreaker(data.tiebreaker?.total_goals?.toString() ?? "");
 
         if (settingsRes.ok) {
           setLocked(settingsData.locks.knockoutStageLocked);
@@ -65,13 +61,13 @@ export default function KnockoutPage() {
 
   const savePick = useCallback(
     async (matchId: string, winner: string) => {
-      if (!userId || locked) return;
+      if (locked) return;
       setSaveState("saving");
       try {
         const response = await fetch("/api/picks/knockout", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, matchId, pickedWinner: winner }),
+          body: JSON.stringify({ matchId, pickedWinner: winner }),
         });
         if (!response.ok) {
           const data = await response.json();
@@ -82,12 +78,12 @@ export default function KnockoutPage() {
         setSaveState("error");
       }
     },
-    [userId, locked],
+    [locked],
   );
 
   const saveTiebreaker = useCallback(
     async (value: string) => {
-      if (!userId || locked) return;
+      if (locked) return;
       const totalGoals = Number(value);
       if (!Number.isInteger(totalGoals) || totalGoals < 0) return;
 
@@ -96,7 +92,7 @@ export default function KnockoutPage() {
         const response = await fetch("/api/picks/knockout", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, totalGoals }),
+          body: JSON.stringify({ totalGoals }),
         });
         if (!response.ok) {
           const data = await response.json();
@@ -107,7 +103,7 @@ export default function KnockoutPage() {
         setSaveState("error");
       }
     },
-    [userId, locked],
+    [locked],
   );
 
   function handlePick(matchId: string, winner: string) {

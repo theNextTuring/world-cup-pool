@@ -4,7 +4,7 @@ Private FIFA World Cup prediction pool for ~30 participants. Built with Next.js 
 
 ## Features
 
-- Name-based entry (no accounts); browser `localStorage` remembers your ID
+- Sign up with first name, last name, and password; log in on any device
 - Group stage drag-and-drop ranking for all 12 groups
 - Knockout bracket picks with tiebreaker
 - Server-enforced deadlines and locks
@@ -16,7 +16,7 @@ Private FIFA World Cup prediction pool for ~30 participants. Built with Next.js 
 ### 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Run the SQL in [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) in the SQL Editor.
+2. Run the SQL in [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) and [`supabase/migrations/002_auth.sql`](supabase/migrations/002_auth.sql) in the SQL Editor.
 
 ### 2. Environment variables
 
@@ -27,6 +27,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ADMIN_SECRET=
+SESSION_SECRET=
 ```
 
 ### 3. Run locally

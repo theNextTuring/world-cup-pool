@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
 import { fetchSettings, getEffectiveLocks } from "@/lib/locks";
+import { getSessionUserId, unauthorized } from "@/lib/session";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidGroupRanking } from "@/lib/teams";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId required" }, { status: 400 });
-    }
+    const userId = await getSessionUserId();
+    if (!userId) return unauthorized();
 
     const supabase = createServiceClient();
     const { data, error } = await supabase
@@ -33,14 +30,16 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const userId = await getSessionUserId();
+    if (!userId) return unauthorized();
+
     const body = await request.json();
-    const userId = String(body.userId ?? "");
     const groupCode = String(body.groupCode ?? "").toUpperCase();
     const ranking = Array.isArray(body.ranking)
       ? body.ranking.map(String)
       : [];
 
-    if (!userId || !groupCode) {
+    if (!groupCode) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
@@ -60,16 +59,6 @@ export async function PUT(request: Request) {
         { error: "Group stage picks are locked" },
         { status: 403 },
       );
-    }
-
-    const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .single();
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const { data, error } = await supabase
