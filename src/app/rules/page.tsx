@@ -129,7 +129,7 @@ export default function RulesPage() {
 
         <RuleCard title="Group stage" accent="emerald">
           <p>Drag teams to rank 1st → 4th in all 12 groups.</p>
-          <p>Picks save automatically as you go.</p>
+          <p>Reordered groups auto-save. Click <strong>Submit all picks</strong> to save every group — even ones you left in the default order.</p>
           <p className="font-medium text-zinc-900 dark:text-zinc-100">
             Deadline: {formatDeadlineET(GROUP_DEADLINE)} ET
           </p>

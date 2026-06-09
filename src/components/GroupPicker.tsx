@@ -72,12 +72,14 @@ export function GroupPicker({
   teams,
   ranking,
   locked,
+  saved = false,
   onChange,
 }: {
   groupCode: string;
   teams: Team[];
   ranking: string[];
   locked: boolean;
+  saved?: boolean;
   onChange: (ranking: string[]) => void;
 }) {
   const sensors = useSensors(
@@ -104,7 +106,18 @@ export function GroupPicker({
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
-      <h3 className="mb-3 text-lg font-semibold">Group {groupCode}</h3>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-lg font-semibold">Group {groupCode}</h3>
+        {saved ? (
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+            Saved
+          </span>
+        ) : (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+            Not saved
+          </span>
+        )}
+      </div>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
