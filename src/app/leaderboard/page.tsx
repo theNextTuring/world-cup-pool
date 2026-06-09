@@ -6,7 +6,17 @@ import { formatDeadlineET } from "@/lib/dates";
 
 type Entry = {
   rank: number;
+  userId: string;
+  firstName: string;
+  lastName: string;
   entryName: string;
+  joinedAt: string;
+  groupSavedCount: number;
+  groupsComplete: boolean;
+  knockoutPickCount: number;
+  knockoutRequiredCount: number;
+  tiebreakerComplete: boolean;
+  knockoutComplete: boolean;
   totalPoints: number;
   groupPoints: number;
   knockoutPoints: number;
@@ -18,6 +28,8 @@ export default function LeaderboardPage() {
   const [visible, setVisible] = useState(false);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [actualGoals, setActualGoals] = useState<number | null>(null);
+  const [scoresVisible, setScoresVisible] = useState(false);
+  const [knockoutPublished, setKnockoutPublished] = useState(false);
   const [deadline, setDeadline] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -34,12 +46,6 @@ export default function LeaderboardPage() {
           setDeadline(settingsData.locks.groupDeadline);
         }
 
-        if (boardRes.status === 403) {
-          setVisible(false);
-          setMessage("Leaderboard will appear after the group stage deadline.");
-          return;
-        }
-
         const boardData = await boardRes.json();
         if (!boardRes.ok) {
           setMessage(boardData.error ?? "Unable to load leaderboard");
@@ -49,6 +55,8 @@ export default function LeaderboardPage() {
         setVisible(true);
         setEntries(boardData.entries ?? []);
         setActualGoals(boardData.actualTotalKnockoutGoals ?? null);
+        setScoresVisible(Boolean(boardData.scoresVisible));
+        setKnockoutPublished(Boolean(boardData.knockoutBracketPublished));
       } finally {
         setLoading(false);
       }
@@ -80,12 +88,17 @@ export default function LeaderboardPage() {
       <div>
         <h1 className="text-2xl font-bold">Leaderboard</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Sorted by total points, then tiebreaker accuracy.
+          See who has joined and whether their picks are complete.
+          {scoresVisible
+            ? " Scores are sorted by total points, then tiebreaker accuracy."
+            : " Scores unlock after the group deadline."}
         </p>
       </div>
       <LeaderboardTable
         entries={entries}
         actualTotalGoals={actualGoals}
+        scoresVisible={scoresVisible}
+        knockoutPublished={knockoutPublished}
       />
     </div>
   );

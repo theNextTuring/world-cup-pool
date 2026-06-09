@@ -82,7 +82,8 @@ export default function RulesPage() {
         </h1>
         <p className="mt-3 max-w-2xl text-emerald-50">
           Rank every group, pick the knockout bracket, and climb the leaderboard.
-          Everything auto-saves. Here&apos;s all you need to know in one place.
+          Save your picks before each deadline. Here&apos;s all you need to know
+          in one place.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -128,8 +129,8 @@ export default function RulesPage() {
         </RuleCard>
 
         <RuleCard title="Group stage" accent="emerald">
-          <p>Drag teams to rank 1st → 4th in all 12 groups.</p>
-          <p>Reordered groups auto-save. Click <strong>Submit all picks</strong> to save every group — even ones you left in the default order.</p>
+          <p>Use ↑/↓ on phones or drag on desktop to rank 1st → 4th in all 12 groups.</p>
+          <p>Changes are local until you click <strong>Save all picks</strong>. Unsaved groups show as <strong>Not saved</strong> and your entry is incomplete.</p>
           <p className="font-medium text-zinc-900 dark:text-zinc-100">
             Deadline: {formatDeadlineET(GROUP_DEADLINE)} ET
           </p>

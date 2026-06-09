@@ -11,19 +11,14 @@ import {
   type LeaderboardEntry,
 } from "@/lib/scoring";
 import { createServiceClient } from "@/lib/supabase";
+import { GROUP_CODES } from "@/lib/teams";
 
 export async function GET() {
   try {
     const supabase = createServiceClient();
     const settings = await fetchSettings(supabase);
     const locks = getEffectiveLocks(settings);
-
-    if (!locks.groupStageLocked) {
-      return NextResponse.json(
-        { error: "Leaderboard hidden until group stage deadline", visible: false },
-        { status: 403 },
-      );
-    }
+    const scoresVisible = locks.groupStageLocked;
 
     const [
       usersRes,
@@ -33,7 +28,9 @@ export async function GET() {
       matchesRes,
       tiebreakersRes,
     ] = await Promise.all([
-      supabase.from("users").select("id, entry_name"),
+      supabase
+        .from("users")
+        .select("id, first_name, last_name, entry_name, created_at"),
       supabase.from("group_picks").select("*"),
       supabase.from("knockout_picks").select("*"),
       supabase.from("group_standings").select("*"),
@@ -58,6 +55,16 @@ export async function GET() {
       );
       const tiebreaker =
         tiebreakers.find((t) => t.user_id === user.id)?.total_goals ?? null;
+      const groupSavedCount = userGroupPicks.length;
+      const groupsComplete = groupSavedCount === GROUP_CODES.length;
+      const knockoutPickCount = userKnockoutPicks.length;
+      const knockoutRequiredCount = matches.length;
+      const tiebreakerComplete = tiebreaker !== null;
+      const knockoutComplete =
+        locks.knockoutBracketPublished &&
+        knockoutRequiredCount > 0 &&
+        knockoutPickCount === knockoutRequiredCount &&
+        tiebreakerComplete;
 
       const groupPoints = scoreGroupPicks(userGroupPicks, standings);
       const knockoutPoints = scoreKnockoutPicks(userKnockoutPicks, matches);
@@ -67,7 +74,16 @@ export async function GET() {
 
       return {
         userId: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
         entryName: user.entry_name,
+        joinedAt: user.created_at,
+        groupSavedCount,
+        groupsComplete,
+        knockoutPickCount,
+        knockoutRequiredCount,
+        tiebreakerComplete,
+        knockoutComplete,
         groupPoints,
         knockoutPoints,
         totalPoints: groupPoints + knockoutPoints,
@@ -84,6 +100,8 @@ export async function GET() {
 
     return NextResponse.json({
       visible: true,
+      scoresVisible,
+      knockoutBracketPublished: locks.knockoutBracketPublished,
       actualTotalKnockoutGoals: actualGoals,
       entries: sorted,
     });

@@ -133,7 +133,16 @@ export function computeMaxRemainingGroupPoints(
 
 export type LeaderboardEntry = {
   userId: string;
+  firstName: string;
+  lastName: string;
   entryName: string;
+  joinedAt: string;
+  groupSavedCount: number;
+  groupsComplete: boolean;
+  knockoutPickCount: number;
+  knockoutRequiredCount: number;
+  tiebreakerComplete: boolean;
+  knockoutComplete: boolean;
   groupPoints: number;
   knockoutPoints: number;
   totalPoints: number;

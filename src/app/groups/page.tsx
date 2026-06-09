@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GroupPicker } from "@/components/GroupPicker";
 import { SaveIndicator } from "@/components/SaveIndicator";
@@ -17,10 +17,8 @@ export default function GroupsPage() {
   const [locked, setLocked] = useState(false);
   const [deadline, setDeadline] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [submitting, setSubmitting] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
   const [loading, setLoading] = useState(true);
-  const pendingRef = useRef<Record<string, string[]>>({});
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const initialRankings = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -88,44 +86,6 @@ export default function GroupsPage() {
     load();
   }, [router, initialRankings]);
 
-  const flushSave = useCallback(
-    async (groupCode: string, ranking: string[]) => {
-      if (locked) return;
-      setSaveState("saving");
-      try {
-        const response = await fetch("/api/picks/group", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ groupCode, ranking }),
-        });
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error ?? "Save failed");
-        }
-        setSavedGroups((prev) => new Set(prev).add(groupCode));
-        setSaveState("saved");
-      } catch {
-        setSaveState("error");
-      }
-    },
-    [locked],
-  );
-
-  const scheduleSave = useCallback(
-    (groupCode: string, ranking: string[]) => {
-      pendingRef.current[groupCode] = ranking;
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        const pending = { ...pendingRef.current };
-        pendingRef.current = {};
-        for (const [code, ranks] of Object.entries(pending)) {
-          void flushSave(code, ranks);
-        }
-      }, 500);
-    },
-    [flushSave],
-  );
-
   function handleChange(groupCode: string, ranking: string[]) {
     setRankings((prev) => ({ ...prev, [groupCode]: ranking }));
     setSavedGroups((prev) => {
@@ -133,29 +93,29 @@ export default function GroupsPage() {
       next.delete(groupCode);
       return next;
     });
-    scheduleSave(groupCode, ranking);
+    setSaveState("idle");
   }
 
-  async function submitAll() {
+  async function saveAll() {
     if (locked) return;
-    setSubmitting(true);
+    setSavingAll(true);
     setSaveState("saving");
     try {
       const response = await fetch("/api/picks/group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rankings: allRankings }),
-      });
+          body: JSON.stringify({ rankings: allRankings }),
+        });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error ?? "Submit failed");
+        throw new Error(data.error ?? "Save failed");
       }
       setSavedGroups(new Set(GROUP_CODES));
       setSaveState("saved");
     } catch {
       setSaveState("error");
     } finally {
-      setSubmitting(false);
+      setSavingAll(false);
     }
   }
 
@@ -173,7 +133,7 @@ export default function GroupsPage() {
           <h1 className="text-2xl font-bold">Group Stage Picks</h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             On phones, use ↑ and ↓ to rank teams. On desktop, drag teams into
-            order. Changes auto-save when you reorder.
+            order. Nothing is saved until you tap Save all picks.
             {entryName && (
               <span className="ml-2 font-medium">Entry: {entryName}</span>
             )}
@@ -183,7 +143,7 @@ export default function GroupsPage() {
           </p>
           <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
             Happy with the default order? You still need to{" "}
-            <strong>Submit all picks</strong> so groups you didn&apos;t touch
+            <strong>Save all picks</strong> so groups you didn&apos;t touch
             get saved too.
           </p>
         </div>
@@ -198,7 +158,7 @@ export default function GroupsPage() {
 
       <p className="text-sm text-zinc-500">
         {savedCount} of 12 groups saved to server
-        {!allSaved && " · submit to save the rest"}
+        {!allSaved && " · save all picks to complete your entry"}
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -225,11 +185,11 @@ export default function GroupsPage() {
             </p>
             <button
               type="button"
-              onClick={submitAll}
-              disabled={submitting}
+              onClick={saveAll}
+              disabled={savingAll}
               className="w-full rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60 sm:w-auto sm:py-2.5"
             >
-              {submitting ? "Submitting…" : "Submit all picks"}
+              {savingAll ? "Saving…" : "Save all picks"}
             </button>
           </div>
         </div>
