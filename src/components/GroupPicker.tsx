@@ -1,0 +1,129 @@
+"use client";
+
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { Team } from "@/lib/teams";
+
+function SortableTeam({
+  team,
+  position,
+  disabled,
+}: {
+  team: Team;
+  position: number;
+  disabled: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: team.slug, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+        isDragging
+          ? "border-emerald-400 bg-emerald-50 shadow-md dark:bg-emerald-950/30"
+          : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+      } ${disabled ? "opacity-70" : ""}`}
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold dark:bg-zinc-800">
+        {position}
+      </span>
+      <span className="flex-1 font-medium">{team.name}</span>
+      {!disabled && (
+        <button
+          type="button"
+          className="cursor-grab rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 active:cursor-grabbing dark:hover:bg-zinc-800"
+          aria-label={`Drag to reorder ${team.name}`}
+          {...attributes}
+          {...listeners}
+        >
+          Drag
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function GroupPicker({
+  groupCode,
+  teams,
+  ranking,
+  locked,
+  onChange,
+}: {
+  groupCode: string;
+  teams: Team[];
+  ranking: string[];
+  locked: boolean;
+  onChange: (ranking: string[]) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const orderedTeams = ranking
+    .map((slug) => teams.find((t) => t.slug === slug))
+    .filter((t): t is Team => Boolean(t));
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = ranking.indexOf(String(active.id));
+    const newIndex = ranking.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    onChange(arrayMove(ranking, oldIndex, newIndex));
+  }
+
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
+      <h3 className="mb-3 text-lg font-semibold">Group {groupCode}</h3>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={ranking}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="flex flex-col gap-2">
+            {orderedTeams.map((team, index) => (
+              <SortableTeam
+                key={team.slug}
+                team={team}
+                position={index + 1}
+                disabled={locked}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </section>
+  );
+}
