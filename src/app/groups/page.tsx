@@ -120,7 +120,7 @@ export default function GroupsPage() {
   }
 
   if (loading) {
-    return <p className="text-zinc-500">Loading your picks…</p>;
+    return <p className="text-zinc-500">Loading your picks...</p>;
   }
 
   const savedCount = savedGroups.size;
@@ -131,20 +131,13 @@ export default function GroupsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Group Stage Picks</h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            On phones, use ↑ and ↓ to rank teams. On desktop, drag teams into
-            order. Nothing is saved until you tap Save all picks.
-            {entryName && (
-              <span className="ml-2 font-medium">Entry: {entryName}</span>
-            )}
-          </p>
+          {entryName && (
+            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              Entry: {entryName}
+            </p>
+          )}
           <p className="mt-1 text-sm text-zinc-500">
             Deadline: {formatDeadlineET(deadline)} ET
-          </p>
-          <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-            Happy with the default order? You still need to{" "}
-            <strong>Save all picks</strong> so groups you didn&apos;t touch
-            get saved too.
           </p>
         </div>
         <SaveIndicator state={saveState} />
@@ -158,7 +151,7 @@ export default function GroupsPage() {
 
       <p className="text-sm text-zinc-500">
         {savedCount} of 12 groups saved to server
-        {!allSaved && " · save all picks to complete your entry"}
+        {!allSaved && " - save all picks to complete your entry"}
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -189,7 +182,7 @@ export default function GroupsPage() {
               disabled={savingAll}
               className="w-full rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60 sm:w-auto sm:py-2.5"
             >
-              {savingAll ? "Saving…" : "Save all picks"}
+              {savingAll ? "Saving..." : "Save all picks"}
             </button>
           </div>
         </div>

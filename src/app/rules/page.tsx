@@ -1,50 +1,27 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { formatDeadlineET } from "@/lib/dates";
 import {
-  MAX_GROUP_POINTS,
-  MAX_KNOCKOUT_POINTS,
-  MAX_TOTAL_POINTS,
+  DEFAULT_SCORING,
+  maxGroupPoints,
+  maxKnockoutPoints,
+  maxTotalPoints,
+  scoringFromSettings,
+  type ScoringConfig,
 } from "@/lib/scoring";
+import type { AppSettings } from "@/lib/supabase";
 
-const GROUP_DEADLINE = "2026-06-11T19:00:00Z";
+const FALLBACK_GROUP_DEADLINE = "2026-06-11T19:00:00Z";
 
-function RuleCard({
-  title,
-  children,
-  accent = "emerald",
-}: {
-  title: string;
-  children: React.ReactNode;
-  accent?: "emerald" | "blue" | "amber" | "violet";
-}) {
-  const accentStyles = {
-    emerald: "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/30",
-    blue: "border-blue-200 bg-blue-50/80 dark:border-blue-900 dark:bg-blue-950/30",
-    amber: "border-amber-200 bg-amber-50/80 dark:border-amber-900 dark:bg-amber-950/30",
-    violet: "border-violet-200 bg-violet-50/80 dark:border-violet-900 dark:bg-violet-950/30",
-  };
-
-  const dotStyles = {
-    emerald: "bg-emerald-500",
-    blue: "bg-blue-500",
-    amber: "bg-amber-500",
-    violet: "bg-violet-500",
-  };
-
-  return (
-    <section
-      className={`rounded-2xl border p-5 sm:p-6 ${accentStyles[accent]}`}
-    >
-      <div className="mb-4 flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${dotStyles[accent]}`} />
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-      </div>
-      <div className="space-y-2 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-        {children}
-      </div>
-    </section>
-  );
-}
+const KNOCKOUT_ROWS = [
+  { round: "r32", label: "Round of 32", matches: 16 },
+  { round: "r16", label: "Round of 16", matches: 8 },
+  { round: "qf", label: "Quarterfinals", matches: 4 },
+  { round: "sf", label: "Semifinals", matches: 2 },
+  { round: "final", label: "Final", matches: 1 },
+] as const;
 
 function PointRow({
   label,
@@ -56,14 +33,12 @@ function PointRow({
   detail?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2 dark:bg-zinc-900/50">
+    <div className="flex items-center justify-between gap-3 border-b border-zinc-200 py-3 last:border-0 dark:border-zinc-800">
       <div>
         <p className="font-medium text-zinc-900 dark:text-zinc-100">{label}</p>
-        {detail && (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">{detail}</p>
-        )}
+        {detail && <p className="text-xs text-zinc-500">{detail}</p>}
       </div>
-      <span className="shrink-0 rounded-full bg-zinc-900 px-2.5 py-0.5 text-xs font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
+      <span className="shrink-0 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
         {points}
       </span>
     </div>
@@ -71,131 +46,147 @@ function PointRow({
 }
 
 export default function RulesPage() {
+  const [scoring, setScoring] = useState<ScoringConfig>(DEFAULT_SCORING);
+  const [groupDeadline, setGroupDeadline] = useState(FALLBACK_GROUP_DEADLINE);
+  const [knockoutDeadline, setKnockoutDeadline] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSettings() {
+      try {
+        const response = await fetch("/api/settings");
+        if (!response.ok) return;
+        const data = (await response.json()) as { settings?: AppSettings };
+        if (cancelled || !data.settings) return;
+        setScoring(scoringFromSettings(data.settings));
+        setGroupDeadline(data.settings.group_deadline);
+        setKnockoutDeadline(data.settings.knockout_deadline);
+      } catch {
+        // Keep the default scoring copy if settings are unavailable.
+      }
+    }
+
+    void loadSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const groupTotal = maxGroupPoints(scoring);
+  const knockoutTotal = maxKnockoutPoints(scoring);
+  const totalPoints = maxTotalPoints(scoring);
+  const perGroupMax = scoring.groupPoints.reduce(
+    (total, points) => total + points,
+    0,
+  );
+
   return (
-    <div className="space-y-8">
-      <div className="rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-700 px-6 py-8 text-white shadow-lg sm:px-8">
-        <p className="text-sm font-medium uppercase tracking-widest text-emerald-100">
+    <div className="mx-auto max-w-4xl space-y-6">
+      <header className="space-y-3">
+        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
           World Cup Pool 2026
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-          How it works
-        </h1>
-        <p className="mt-3 max-w-2xl text-emerald-50">
-          Rank every group, pick the knockout bracket, and climb the leaderboard.
-          Save your picks before each deadline. Here&apos;s all you need to know
-          in one place.
+        <h1 className="text-3xl font-bold tracking-tight">Rules</h1>
+        <p className="max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+          Entry is $5. Send payment on Venmo to{" "}
+          <strong>@lockofthecentury</strong>. Make your picks before each
+          deadline; locked picks are final.
         </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/"
-            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
-          >
-            Log in / Sign up
-          </Link>
+        <div className="flex flex-wrap gap-2">
           <Link
             href="/groups"
-            className="rounded-xl border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
           >
             Make picks
           </Link>
+          <Link
+            href="/leaderboard"
+            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          >
+            Leaderboard
+          </Link>
         </div>
-      </div>
+      </header>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-3xl font-bold text-emerald-600">{MAX_TOTAL_POINTS}</p>
-          <p className="mt-1 text-sm text-zinc-500">Max total points</p>
+      <section className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+          <p className="text-2xl font-bold">{totalPoints}</p>
+          <p className="text-sm text-zinc-500">Max points</p>
         </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-3xl font-bold text-emerald-600">12</p>
-          <p className="mt-1 text-sm text-zinc-500">Groups to rank</p>
+        <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+          <p className="text-2xl font-bold">12</p>
+          <p className="text-sm text-zinc-500">Groups</p>
         </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-3xl font-bold text-emerald-600">31</p>
-          <p className="mt-1 text-sm text-zinc-500">Knockout matches</p>
+        <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+          <p className="text-2xl font-bold">31</p>
+          <p className="text-sm text-zinc-500">Knockout matches</p>
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <RuleCard title="Join the pool" accent="blue">
-          <p>
-            Sign up with your <strong>first name</strong>,{" "}
-            <strong>last name</strong>, and a <strong>password</strong>.
-          </p>
-          <p>
-            Log in anytime on any device with the same info. Forgot your
-            password? Contact the pool admin for a reset.
-          </p>
-        </RuleCard>
-
-        <RuleCard title="Group stage" accent="emerald">
-          <p>Use ↑/↓ on phones or drag on desktop to rank 1st → 4th in all 12 groups.</p>
-          <p>Changes are local until you click <strong>Save all picks</strong>. Unsaved groups show as <strong>Not saved</strong> and your entry is incomplete.</p>
-          <p className="font-medium text-zinc-900 dark:text-zinc-100">
-            Deadline: {formatDeadlineET(GROUP_DEADLINE)} ET
-          </p>
-          <p>After the deadline, group picks lock permanently.</p>
-        </RuleCard>
-
-        <RuleCard title="Knockout stage" accent="amber">
-          <p>Opens after the admin publishes the bracket.</p>
-          <p>Pick the winner of all 31 knockout matches.</p>
-          <p>
-            Enter your <strong>tiebreaker</strong>: total goals in all knockout
-            games (penalty shootouts don&apos;t count).
-          </p>
-          <p>Knockout deadline is set by the admin.</p>
-        </RuleCard>
-
-        <RuleCard title="Leaderboard & ties" accent="violet">
-          <p>Hidden until the group deadline passes, then public for everyone.</p>
-          <p>
-            Tied on points? Closest tiebreaker guess to the actual total knockout
-            goals wins.
-          </p>
-          <p>Still tied after that? Shared rank.</p>
-        </RuleCard>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-          <h2 className="mb-4 text-lg font-semibold">Group scoring</h2>
-          <div className="space-y-2">
-            <PointRow label="Correct 1st place" points="3 pts" />
-            <PointRow label="Correct 2nd place" points="3 pts" />
-            <PointRow label="Correct 3rd place" points="2 pts" />
-            <PointRow label="Correct 4th place" points="2 pts" />
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+          <h2 className="text-lg font-semibold">Group scoring</h2>
+          <div className="mt-3">
             <PointRow
-              label="Per group max"
-              points="10 pts"
-              detail="12 groups"
+              label="Correct 1st place"
+              points={`${scoring.groupPoints[0]} pts`}
             />
             <PointRow
-              label="Group stage total"
-              points={`${MAX_GROUP_POINTS} pts`}
+              label="Correct 2nd place"
+              points={`${scoring.groupPoints[1]} pts`}
             />
+            <PointRow
+              label="Correct 3rd place"
+              points={`${scoring.groupPoints[2]} pts`}
+            />
+            <PointRow
+              label="Correct 4th place"
+              points={`${scoring.groupPoints[3]} pts`}
+            />
+            <PointRow
+              label="Per group"
+              points={`${perGroupMax} pts`}
+              detail="Rank all four teams in a group"
+            />
+            <PointRow label="Group stage max" points={`${groupTotal} pts`} />
           </div>
-        </section>
+        </div>
 
-        <section className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-          <h2 className="mb-4 text-lg font-semibold">Knockout scoring</h2>
-          <div className="space-y-2">
-            <PointRow label="Round of 32" points="2 pts" detail="16 matches" />
-            <PointRow label="Round of 16" points="3 pts" detail="8 matches" />
-            <PointRow label="Quarterfinals" points="5 pts" detail="4 matches" />
-            <PointRow label="Semifinals" points="7 pts" detail="2 matches" />
-            <PointRow label="Final" points="10 pts" detail="1 match" />
-            <PointRow
-              label="Knockout total"
-              points={`${MAX_KNOCKOUT_POINTS} pts`}
-            />
+        <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+          <h2 className="text-lg font-semibold">Knockout scoring</h2>
+          <div className="mt-3">
+            {KNOCKOUT_ROWS.map((row) => (
+              <PointRow
+                key={row.round}
+                label={row.label}
+                points={`${scoring.knockoutPoints[row.round]} pts`}
+                detail={`${row.matches} match${row.matches === 1 ? "" : "es"}`}
+              />
+            ))}
+            <PointRow label="Knockout max" points={`${knockoutTotal} pts`} />
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
-      <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-5 py-4 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
-        Questions? Reach out to the pool admin. Good luck!
-      </div>
+      <section className="rounded-xl border border-zinc-200 p-5 text-sm leading-6 dark:border-zinc-800">
+        <h2 className="text-lg font-semibold">Need to know</h2>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-zinc-600 dark:text-zinc-400">
+          <li>Save all 12 group rankings before {formatDeadlineET(groupDeadline)} ET.</li>
+          <li>
+            Knockout picks open after the bracket is published. Deadline:{" "}
+            {knockoutDeadline ? `${formatDeadlineET(knockoutDeadline)} ET` : "TBD"}.
+          </li>
+          <li>
+            Tiebreaker is total knockout goals. Penalty shootout goals do not
+            count.
+          </li>
+          <li>
+            Leaderboard points appear after group picks lock. Ties go to the
+            closest tiebreaker.
+          </li>
+        </ul>
+      </section>
     </div>
   );
 }

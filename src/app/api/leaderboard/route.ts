@@ -6,6 +6,7 @@ import {
   groupPickToRanking,
   scoreGroupPicks,
   scoreKnockoutPicks,
+  scoringFromSettings,
   sortLeaderboard,
   tiebreakerDistance,
   type LeaderboardEntry,
@@ -18,6 +19,7 @@ export async function GET() {
     const supabase = createServiceClient();
     const settings = await fetchSettings(supabase);
     const locks = getEffectiveLocks(settings);
+    const scoring = scoringFromSettings(settings);
     const scoresVisible = locks.groupStageLocked;
 
     const [
@@ -66,11 +68,19 @@ export async function GET() {
         knockoutPickCount === knockoutRequiredCount &&
         tiebreakerComplete;
 
-      const groupPoints = scoreGroupPicks(userGroupPicks, standings);
-      const knockoutPoints = scoreKnockoutPicks(userKnockoutPicks, matches);
+      const groupPoints = scoreGroupPicks(userGroupPicks, standings, scoring);
+      const knockoutPoints = scoreKnockoutPicks(
+        userKnockoutPicks,
+        matches,
+        scoring,
+      );
       const maxRemaining =
-        computeMaxRemainingGroupPoints(userGroupPicks, standings) +
-        computeMaxRemainingKnockoutPoints(userKnockoutPicks, matches);
+        computeMaxRemainingGroupPoints(userGroupPicks, standings, scoring) +
+        computeMaxRemainingKnockoutPoints(
+          userKnockoutPicks,
+          matches,
+          scoring,
+        );
 
       return {
         userId: user.id,

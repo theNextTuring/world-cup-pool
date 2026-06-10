@@ -21,6 +21,15 @@ type AppSettings = {
   knockout_stage_locked: boolean;
   knockout_bracket_published: boolean;
   actual_total_knockout_goals: number | null;
+  group_rank1_points: number;
+  group_rank2_points: number;
+  group_rank3_points: number;
+  group_rank4_points: number;
+  knockout_r32_points: number;
+  knockout_r16_points: number;
+  knockout_qf_points: number;
+  knockout_sf_points: number;
+  knockout_final_points: number;
 };
 
 type Standing = {
@@ -51,6 +60,37 @@ const EXPECTED_BRACKET_MATCHES = Object.values(ROUND_REQUIREMENTS).reduce(
   (total, count) => total + count,
   0,
 );
+
+type ScoringField = {
+  key: keyof Pick<
+    AppSettings,
+    | "group_rank1_points"
+    | "group_rank2_points"
+    | "group_rank3_points"
+    | "group_rank4_points"
+    | "knockout_r32_points"
+    | "knockout_r16_points"
+    | "knockout_qf_points"
+    | "knockout_sf_points"
+    | "knockout_final_points"
+  >;
+  label: string;
+};
+
+const GROUP_SCORING_FIELDS: ScoringField[] = [
+  { key: "group_rank1_points", label: "Correct 1st" },
+  { key: "group_rank2_points", label: "Correct 2nd" },
+  { key: "group_rank3_points", label: "Correct 3rd" },
+  { key: "group_rank4_points", label: "Correct 4th" },
+];
+
+const KNOCKOUT_SCORING_FIELDS: ScoringField[] = [
+  { key: "knockout_r32_points", label: "Round of 32" },
+  { key: "knockout_r16_points", label: "Round of 16" },
+  { key: "knockout_qf_points", label: "Quarterfinals" },
+  { key: "knockout_sf_points", label: "Semifinals" },
+  { key: "knockout_final_points", label: "Final" },
+];
 
 function defaultStandings(): Record<string, string[]> {
   const map: Record<string, string[]> = {};
@@ -229,6 +269,24 @@ export default function AdminPage() {
           partial.actual_total_knockout_goals !== undefined
             ? partial.actual_total_knockout_goals
             : settings.actual_total_knockout_goals,
+        groupRank1Points:
+          partial.group_rank1_points ?? settings.group_rank1_points,
+        groupRank2Points:
+          partial.group_rank2_points ?? settings.group_rank2_points,
+        groupRank3Points:
+          partial.group_rank3_points ?? settings.group_rank3_points,
+        groupRank4Points:
+          partial.group_rank4_points ?? settings.group_rank4_points,
+        knockoutR32Points:
+          partial.knockout_r32_points ?? settings.knockout_r32_points,
+        knockoutR16Points:
+          partial.knockout_r16_points ?? settings.knockout_r16_points,
+        knockoutQfPoints:
+          partial.knockout_qf_points ?? settings.knockout_qf_points,
+        knockoutSfPoints:
+          partial.knockout_sf_points ?? settings.knockout_sf_points,
+        knockoutFinalPoints:
+          partial.knockout_final_points ?? settings.knockout_final_points,
       }),
     });
     const data = await response.json();
@@ -508,6 +566,59 @@ export default function AdminPage() {
             }
           />
         </label>
+        <div className="space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+          <h3 className="text-sm font-semibold">Scoring</h3>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Group stage
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {GROUP_SCORING_FIELDS.map((field) => (
+                  <label key={field.key} className="text-sm">
+                    {field.label}
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+                      value={settings[field.key]}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          [field.key]: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Knockout
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {KNOCKOUT_SCORING_FIELDS.map((field) => (
+                  <label key={field.key} className="text-sm">
+                    {field.label}
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+                      value={settings[field.key]}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          [field.key]: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
         <button
           type="button"
           onClick={() => saveSettings(settings)}

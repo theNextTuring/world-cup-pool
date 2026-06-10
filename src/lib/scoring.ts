@@ -1,4 +1,10 @@
-import type { GroupPick, GroupStanding, KnockoutMatch, KnockoutPick } from "./supabase";
+import type {
+  AppSettings,
+  GroupPick,
+  GroupStanding,
+  KnockoutMatch,
+  KnockoutPick,
+} from "./supabase";
 
 export const GROUP_POINTS = [3, 3, 2, 2] as const;
 
@@ -13,9 +19,74 @@ export const KNOCKOUT_ROUND_POINTS: Record<
   final: 10,
 };
 
-export const MAX_GROUP_POINTS = 120;
-export const MAX_KNOCKOUT_POINTS = 100;
-export const MAX_TOTAL_POINTS = 220;
+export type GroupScoring = [number, number, number, number];
+
+export type KnockoutScoring = Record<KnockoutMatch["round"], number>;
+
+export type ScoringConfig = {
+  groupPoints: GroupScoring;
+  knockoutPoints: KnockoutScoring;
+};
+
+export const DEFAULT_SCORING: ScoringConfig = {
+  groupPoints: [...GROUP_POINTS],
+  knockoutPoints: { ...KNOCKOUT_ROUND_POINTS },
+};
+
+const KNOCKOUT_MATCH_COUNTS: Record<KnockoutMatch["round"], number> = {
+  r32: 16,
+  r16: 8,
+  qf: 4,
+  sf: 2,
+  final: 1,
+};
+
+function validPointValue(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : fallback;
+}
+
+export function scoringFromSettings(settings: AppSettings): ScoringConfig {
+  return {
+    groupPoints: [
+      validPointValue(settings.group_rank1_points, GROUP_POINTS[0]),
+      validPointValue(settings.group_rank2_points, GROUP_POINTS[1]),
+      validPointValue(settings.group_rank3_points, GROUP_POINTS[2]),
+      validPointValue(settings.group_rank4_points, GROUP_POINTS[3]),
+    ],
+    knockoutPoints: {
+      r32: validPointValue(settings.knockout_r32_points, KNOCKOUT_ROUND_POINTS.r32),
+      r16: validPointValue(settings.knockout_r16_points, KNOCKOUT_ROUND_POINTS.r16),
+      qf: validPointValue(settings.knockout_qf_points, KNOCKOUT_ROUND_POINTS.qf),
+      sf: validPointValue(settings.knockout_sf_points, KNOCKOUT_ROUND_POINTS.sf),
+      final: validPointValue(
+        settings.knockout_final_points,
+        KNOCKOUT_ROUND_POINTS.final,
+      ),
+    },
+  };
+}
+
+export function maxGroupPoints(scoring: ScoringConfig): number {
+  return scoring.groupPoints.reduce((total, points) => total + points, 0) * 12;
+}
+
+export function maxKnockoutPoints(scoring: ScoringConfig): number {
+  return Object.entries(KNOCKOUT_MATCH_COUNTS).reduce(
+    (total, [round, count]) =>
+      total + scoring.knockoutPoints[round as KnockoutMatch["round"]] * count,
+    0,
+  );
+}
+
+export function maxTotalPoints(scoring: ScoringConfig): number {
+  return maxGroupPoints(scoring) + maxKnockoutPoints(scoring);
+}
+
+export const MAX_GROUP_POINTS = maxGroupPoints(DEFAULT_SCORING);
+export const MAX_KNOCKOUT_POINTS = maxKnockoutPoints(DEFAULT_SCORING);
+export const MAX_TOTAL_POINTS = maxTotalPoints(DEFAULT_SCORING);
 
 export type GroupPickRanking = {
   group_code: string;
@@ -41,6 +112,7 @@ export function standingToRanks(standing: GroupStanding): [string, string, strin
 export function scoreGroupPicks(
   picks: GroupPickRanking[],
   standings: GroupStanding[],
+  scoring: ScoringConfig = DEFAULT_SCORING,
 ): number {
   const standingByGroup = Object.fromEntries(
     standings.map((s) => [s.group_code, standingToRanks(s)]),
@@ -52,7 +124,7 @@ export function scoreGroupPicks(
     if (!actual) continue;
     for (let i = 0; i < 4; i++) {
       if (pick.ranks[i] === actual[i]) {
-        total += GROUP_POINTS[i];
+        total += scoring.groupPoints[i];
       }
     }
   }
@@ -62,6 +134,7 @@ export function scoreGroupPicks(
 export function scoreKnockoutPicks(
   picks: KnockoutPick[],
   matches: KnockoutMatch[],
+  scoring: ScoringConfig = DEFAULT_SCORING,
 ): number {
   const matchById = Object.fromEntries(matches.map((m) => [m.id, m]));
   let total = 0;
@@ -70,7 +143,7 @@ export function scoreKnockoutPicks(
     const match = matchById[pick.match_id];
     if (!match?.winner) continue;
     if (pick.picked_winner === match.winner) {
-      total += KNOCKOUT_ROUND_POINTS[match.round];
+      total += scoring.knockoutPoints[match.round];
     }
   }
 
@@ -80,6 +153,7 @@ export function scoreKnockoutPicks(
 export function computeMaxRemainingKnockoutPoints(
   picks: KnockoutPick[],
   matches: KnockoutMatch[],
+  scoring: ScoringConfig = DEFAULT_SCORING,
 ): number {
   const pickByMatch = Object.fromEntries(
     picks.map((p) => [p.match_id, p.picked_winner]),
@@ -90,13 +164,13 @@ export function computeMaxRemainingKnockoutPoints(
     if (match.winner) continue;
     const picked = pickByMatch[match.id];
     if (!picked) {
-      remaining += KNOCKOUT_ROUND_POINTS[match.round];
+      remaining += scoring.knockoutPoints[match.round];
       continue;
     }
     const couldStillWin =
       picked === match.team_a || picked === match.team_b;
     if (couldStillWin) {
-      remaining += KNOCKOUT_ROUND_POINTS[match.round];
+      remaining += scoring.knockoutPoints[match.round];
     }
   }
   return remaining;
@@ -105,6 +179,7 @@ export function computeMaxRemainingKnockoutPoints(
 export function computeMaxRemainingGroupPoints(
   picks: GroupPickRanking[],
   standings: GroupStanding[],
+  scoring: ScoringConfig = DEFAULT_SCORING,
 ): number {
   const standingByGroup = Object.fromEntries(
     standings.map((s) => [s.group_code, standingToRanks(s)]),
@@ -114,17 +189,21 @@ export function computeMaxRemainingGroupPoints(
   );
 
   let remaining = 0;
+  const perGroupMax = scoring.groupPoints.reduce(
+    (total, points) => total + points,
+    0,
+  );
   for (const code of "ABCDEFGHIJKL") {
     const actual = standingByGroup[code];
     if (!actual) {
-      remaining += 10;
+      remaining += perGroupMax;
       continue;
     }
     const pick = pickByGroup[code];
     if (!pick) continue;
     for (let i = 0; i < 4; i++) {
       if (pick[i] !== actual[i]) {
-        remaining += GROUP_POINTS[i];
+        remaining += scoring.groupPoints[i];
       }
     }
   }

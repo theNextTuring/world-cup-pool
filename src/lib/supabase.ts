@@ -8,6 +8,15 @@ export type AppSettings = {
   knockout_stage_locked: boolean;
   knockout_bracket_published: boolean;
   actual_total_knockout_goals: number | null;
+  group_rank1_points: number;
+  group_rank2_points: number;
+  group_rank3_points: number;
+  group_rank4_points: number;
+  knockout_r32_points: number;
+  knockout_r16_points: number;
+  knockout_qf_points: number;
+  knockout_sf_points: number;
+  knockout_final_points: number;
 };
 
 export type DbUser = {

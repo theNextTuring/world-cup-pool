@@ -3,6 +3,24 @@ import { adminUnauthorized, isAdminAuthenticated } from "@/lib/admin";
 import { fetchSettings } from "@/lib/locks";
 import { createServiceClient } from "@/lib/supabase";
 
+const SCORING_FIELDS = [
+  ["groupRank1Points", "group_rank1_points"],
+  ["groupRank2Points", "group_rank2_points"],
+  ["groupRank3Points", "group_rank3_points"],
+  ["groupRank4Points", "group_rank4_points"],
+  ["knockoutR32Points", "knockout_r32_points"],
+  ["knockoutR16Points", "knockout_r16_points"],
+  ["knockoutQfPoints", "knockout_qf_points"],
+  ["knockoutSfPoints", "knockout_sf_points"],
+  ["knockoutFinalPoints", "knockout_final_points"],
+] as const;
+
+function parsePoints(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
 export async function GET() {
   if (!(await isAdminAuthenticated())) return adminUnauthorized();
 
@@ -45,6 +63,17 @@ export async function PUT(request: Request) {
       const value = body.actualTotalKnockoutGoals;
       updates.actual_total_knockout_goals =
         value === null || value === "" ? null : Number(value);
+    }
+    for (const [bodyKey, dbKey] of SCORING_FIELDS) {
+      if (body[bodyKey] === undefined) continue;
+      const points = parsePoints(body[bodyKey]);
+      if (points === null) {
+        return NextResponse.json(
+          { error: "Scoring values must be whole numbers 0 or higher" },
+          { status: 400 },
+        );
+      }
+      updates[dbKey] = points;
     }
 
     const { data, error } = await supabase
