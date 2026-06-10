@@ -89,9 +89,7 @@ export default function RulesPage() {
         </p>
         <h1 className="text-3xl font-bold tracking-tight">Rules</h1>
         <p className="max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-          Entry is $5. Send payment on Venmo to{" "}
-          <strong>@lockofthecentury</strong>. Make your picks before each
-          deadline; locked picks are final.
+          Make your picks before each deadline; locked picks are final.
         </p>
         <div className="flex flex-wrap gap-2">
           <Link
