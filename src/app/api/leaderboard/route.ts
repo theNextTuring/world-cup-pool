@@ -100,6 +100,7 @@ export async function GET() {
         tiebreaker,
         tiebreakerDistance: tiebreakerDistance(tiebreaker, actualGoals),
         maxRemaining,
+        groupPredictions: scoresVisible ? userGroupPicks : undefined,
       };
     });
 

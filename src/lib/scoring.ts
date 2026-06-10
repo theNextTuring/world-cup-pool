@@ -6,17 +6,17 @@ import type {
   KnockoutPick,
 } from "./supabase";
 
-export const GROUP_POINTS = [3, 3, 2, 2] as const;
+export const GROUP_POINTS = [1, 1, 1, 1] as const;
 
 export const KNOCKOUT_ROUND_POINTS: Record<
   KnockoutMatch["round"],
   number
 > = {
-  r32: 2,
-  r16: 3,
-  qf: 5,
-  sf: 7,
-  final: 10,
+  r32: 1,
+  r16: 2,
+  qf: 3,
+  sf: 5,
+  final: 8,
 };
 
 export type GroupScoring = [number, number, number, number];
@@ -228,6 +228,7 @@ export type LeaderboardEntry = {
   tiebreaker: number | null;
   tiebreakerDistance: number | null;
   maxRemaining: number;
+  groupPredictions?: GroupPickRanking[];
 };
 
 export function sortLeaderboard(

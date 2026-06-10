@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { GROUP_POINTS, KNOCKOUT_ROUND_POINTS } from "./scoring";
 import type { AppSettings } from "./supabase";
 
 export type EffectiveLocks = {
@@ -46,5 +47,17 @@ export async function fetchSettings(
     throw new Error("Failed to load app settings");
   }
 
-  return data;
+  return {
+    ...data,
+    group_rank1_points: data.group_rank1_points ?? GROUP_POINTS[0],
+    group_rank2_points: data.group_rank2_points ?? GROUP_POINTS[1],
+    group_rank3_points: data.group_rank3_points ?? GROUP_POINTS[2],
+    group_rank4_points: data.group_rank4_points ?? GROUP_POINTS[3],
+    knockout_r32_points: data.knockout_r32_points ?? KNOCKOUT_ROUND_POINTS.r32,
+    knockout_r16_points: data.knockout_r16_points ?? KNOCKOUT_ROUND_POINTS.r16,
+    knockout_qf_points: data.knockout_qf_points ?? KNOCKOUT_ROUND_POINTS.qf,
+    knockout_sf_points: data.knockout_sf_points ?? KNOCKOUT_ROUND_POINTS.sf,
+    knockout_final_points:
+      data.knockout_final_points ?? KNOCKOUT_ROUND_POINTS.final,
+  };
 }

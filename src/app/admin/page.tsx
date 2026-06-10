@@ -292,7 +292,7 @@ export default function AdminPage() {
     const data = await response.json();
     if (response.ok) {
       setSettings(data.settings);
-      setMessage("Settings saved");
+      setMessage(data.warning ?? "Settings saved");
     } else {
       setMessage(data.error ?? "Failed to save settings");
     }

@@ -21,6 +21,13 @@ function parsePoints(value: unknown): number | null {
   return parsed;
 }
 
+function isMissingScoringColumnError(errorMessage: string): boolean {
+  return (
+    errorMessage.includes("schema cache") ||
+    SCORING_FIELDS.some(([, dbKey]) => errorMessage.includes(dbKey))
+  );
+}
+
 export async function GET() {
   if (!(await isAdminAuthenticated())) return adminUnauthorized();
 
@@ -44,6 +51,7 @@ export async function PUT(request: Request) {
     const supabase = createServiceClient();
 
     const updates: Record<string, unknown> = {};
+    const scoringUpdates: Record<string, unknown> = {};
     if (body.groupDeadline !== undefined) {
       updates.group_deadline = body.groupDeadline;
     }
@@ -73,24 +81,55 @@ export async function PUT(request: Request) {
           { status: 400 },
         );
       }
-      updates[dbKey] = points;
+      scoringUpdates[dbKey] = points;
     }
 
+    const allUpdates = { ...updates, ...scoringUpdates };
     const { data, error } = await supabase
       .from("app_settings")
-      .update(updates)
+      .update(allUpdates)
       .eq("id", 1)
       .select("*")
       .single();
 
     if (error || !data) {
+      const errorMessage = error?.message ?? "Update failed";
+      if (
+        Object.keys(scoringUpdates).length > 0 &&
+        isMissingScoringColumnError(errorMessage)
+      ) {
+        if (Object.keys(updates).length === 0) {
+          const settings = await fetchSettings(supabase);
+          return NextResponse.json({
+            settings,
+            warning:
+              "Scoring is using app defaults until the Supabase migration is applied.",
+          });
+        }
+
+        const retry = await supabase
+          .from("app_settings")
+          .update(updates)
+          .eq("id", 1)
+          .select("*")
+          .single();
+
+        if (!retry.error && retry.data) {
+          return NextResponse.json({
+            settings: await fetchSettings(supabase),
+            warning:
+              "Scoring is using app defaults until the Supabase migration is applied.",
+          });
+        }
+      }
+
       return NextResponse.json(
-        { error: error?.message ?? "Update failed" },
+        { error: errorMessage },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ settings: data });
+    return NextResponse.json({ settings: await fetchSettings(supabase) });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Server error" },

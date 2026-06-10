@@ -22,6 +22,10 @@ type Entry = {
   knockoutPoints: number;
   tiebreaker: number | null;
   maxRemaining: number;
+  groupPredictions?: {
+    group_code: string;
+    ranks: [string, string, string, string];
+  }[];
 };
 
 export default function LeaderboardPage() {

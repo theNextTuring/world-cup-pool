@@ -1,3 +1,14 @@
+"use client";
+
+import { Fragment, useState } from "react";
+import { TeamLabel } from "@/components/TeamLabel";
+import { GROUP_CODES } from "@/lib/teams";
+
+type GroupPrediction = {
+  group_code: string;
+  ranks: [string, string, string, string];
+};
+
 type Entry = {
   rank: number;
   userId: string;
@@ -16,6 +27,7 @@ type Entry = {
   knockoutPoints: number;
   tiebreaker: number | null;
   maxRemaining: number;
+  groupPredictions?: GroupPrediction[];
 };
 
 export function LeaderboardTable({
@@ -29,6 +41,8 @@ export function LeaderboardTable({
   scoresVisible: boolean;
   knockoutPublished: boolean;
 }) {
+  const [openUserId, setOpenUserId] = useState<string | null>(null);
+
   if (!entries.length) {
     return (
       <p className="text-zinc-500">No entries yet. Be the first to join!</p>
@@ -56,6 +70,14 @@ export function LeaderboardTable({
     });
   }
 
+  function groupPredictionMap(entry: Entry) {
+    return Object.fromEntries(
+      (entry.groupPredictions ?? []).map((pick) => [pick.group_code, pick.ranks]),
+    ) as Record<string, [string, string, string, string] | undefined>;
+  }
+
+  const columnCount = scoresVisible ? 9 : 6;
+
   return (
     <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
       <table className="min-w-full text-left text-sm">
@@ -77,70 +99,133 @@ export function LeaderboardTable({
           </tr>
         </thead>
         <tbody>
-          {entries.map((entry) => (
-            <tr
-              key={entry.userId}
-              className="border-t border-zinc-200 dark:border-zinc-800"
-            >
-              <td className="px-4 py-3 font-semibold">{entry.rank}</td>
-              <td className="px-4 py-3">
-                <div className="font-medium">
-                  {entry.firstName} {entry.lastName}
-                </div>
-                <div className="text-xs text-zinc-500">
-                  {entry.entryName} · joined {formatJoinedDate(entry.joinedAt)}
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                <div className="space-y-1">
-                  {statusBadge(
-                    entry.groupsComplete,
-                    entry.groupsComplete ? "Complete" : "Incomplete",
-                  )}
-                  <div className="text-xs text-zinc-500">
-                    {entry.groupSavedCount}/12 groups saved
-                  </div>
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                {knockoutPublished ? (
-                  <div className="space-y-1">
-                    {statusBadge(
-                      entry.knockoutComplete,
-                      entry.knockoutComplete ? "Complete" : "Incomplete",
+          {entries.map((entry) => {
+            const expanded = openUserId === entry.userId;
+            const predictionsByGroup = groupPredictionMap(entry);
+
+            return (
+              <Fragment key={entry.userId}>
+                <tr className="border-t border-zinc-200 dark:border-zinc-800">
+                  <td className="px-4 py-3 font-semibold">{entry.rank}</td>
+                  <td className="px-4 py-3">
+                    {scoresVisible ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenUserId(expanded ? null : entry.userId)
+                        }
+                        className="text-left"
+                        aria-expanded={expanded}
+                      >
+                        <span className="block font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300">
+                          {entry.firstName} {entry.lastName}
+                        </span>
+                        <span className="block text-xs text-zinc-500">
+                          {expanded ? "Hide picks" : "View group picks"}
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="font-medium">
+                        {entry.firstName} {entry.lastName}
+                      </div>
                     )}
                     <div className="text-xs text-zinc-500">
-                      {entry.knockoutPickCount}/{entry.knockoutRequiredCount}{" "}
-                      matches
-                      {!entry.tiebreakerComplete && " · tiebreaker needed"}
+                      {entry.entryName} - joined {formatJoinedDate(entry.joinedAt)}
                     </div>
-                  </div>
-                ) : (
-                  <span className="text-xs text-zinc-500">Not open yet</span>
-                )}
-              </td>
-              {scoresVisible && (
-                <>
-                  <td className="px-4 py-3 font-semibold">
-                    {entry.totalPoints}
                   </td>
-                  <td className="px-4 py-3">{entry.groupPoints}</td>
-                  <td className="px-4 py-3">{entry.knockoutPoints}</td>
-                </>
-              )}
-              <td className="px-4 py-3">
-                {entry.tiebreaker ?? "—"}
-                {actualTotalGoals !== null && entry.tiebreaker !== null && (
-                  <span className="ml-1 text-xs text-zinc-500">
-                    (off by {Math.abs(entry.tiebreaker - actualTotalGoals)})
-                  </span>
+                  <td className="px-4 py-3">
+                    <div className="space-y-1">
+                      {statusBadge(
+                        entry.groupsComplete,
+                        entry.groupsComplete ? "Complete" : "Incomplete",
+                      )}
+                      <div className="text-xs text-zinc-500">
+                        {entry.groupSavedCount}/12 groups saved
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {knockoutPublished ? (
+                      <div className="space-y-1">
+                        {statusBadge(
+                          entry.knockoutComplete,
+                          entry.knockoutComplete ? "Complete" : "Incomplete",
+                        )}
+                        <div className="text-xs text-zinc-500">
+                          {entry.knockoutPickCount}/{entry.knockoutRequiredCount}{" "}
+                          matches
+                          {!entry.tiebreakerComplete && " - tiebreaker needed"}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-zinc-500">Not open yet</span>
+                    )}
+                  </td>
+                  {scoresVisible && (
+                    <>
+                      <td className="px-4 py-3 font-semibold">
+                        {entry.totalPoints}
+                      </td>
+                      <td className="px-4 py-3">{entry.groupPoints}</td>
+                      <td className="px-4 py-3">{entry.knockoutPoints}</td>
+                    </>
+                  )}
+                  <td className="px-4 py-3">
+                    {entry.tiebreaker ?? "-"}
+                    {actualTotalGoals !== null && entry.tiebreaker !== null && (
+                      <span className="ml-1 text-xs text-zinc-500">
+                        (off by {Math.abs(entry.tiebreaker - actualTotalGoals)})
+                      </span>
+                    )}
+                  </td>
+                  {scoresVisible && (
+                    <td className="px-4 py-3">{entry.maxRemaining}</td>
+                  )}
+                </tr>
+                {scoresVisible && expanded && (
+                  <tr className="border-t border-zinc-200 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/50">
+                    <td colSpan={columnCount} className="px-4 py-4">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {GROUP_CODES.map((groupCode) => {
+                          const ranks = predictionsByGroup[groupCode];
+
+                          return (
+                            <div
+                              key={groupCode}
+                              className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
+                            >
+                              <p className="mb-2 text-sm font-semibold">
+                                Group {groupCode}
+                              </p>
+                              {ranks ? (
+                                <ol className="space-y-1 text-sm">
+                                  {ranks.map((slug, index) => (
+                                    <li
+                                      key={slug}
+                                      className="flex items-center gap-2"
+                                    >
+                                      <span className="w-5 shrink-0 text-xs font-semibold text-zinc-500">
+                                        {index + 1}
+                                      </span>
+                                      <TeamLabel slug={slug} flagSize={18} />
+                                    </li>
+                                  ))}
+                                </ol>
+                              ) : (
+                                <p className="text-sm text-zinc-500">
+                                  Not saved
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  </tr>
                 )}
-              </td>
-              {scoresVisible && (
-                <td className="px-4 py-3">{entry.maxRemaining}</td>
-              )}
-            </tr>
-          ))}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
       {actualTotalGoals !== null && (
