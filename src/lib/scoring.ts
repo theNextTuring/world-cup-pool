@@ -235,16 +235,9 @@ export function computeMaxRemainingGroupPoints(
   );
   for (const code of "ABCDEFGHIJKL") {
     const actual = standingByGroup[code];
-    if (!actual) {
-      remaining += perGroupMax;
-      continue;
-    }
     const pick = pickByGroup[code];
-    if (!pick) continue;
-    for (let i = 0; i < 4; i++) {
-      if (pick[i] !== actual[i]) {
-        remaining += scoring.groupPoints[i];
-      }
+    if (!actual && pick) {
+      remaining += perGroupMax;
     }
   }
   return remaining;
