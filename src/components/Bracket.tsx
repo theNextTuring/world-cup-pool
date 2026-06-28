@@ -2,6 +2,10 @@
 
 import type { KnockoutMatch } from "@/lib/supabase";
 import { TeamLabel } from "@/components/TeamLabel";
+import {
+  participantName,
+  participantOptionsForMatch,
+} from "@/lib/bracket";
 
 const ROUND_LABELS: Record<KnockoutMatch["round"], string> = {
   r32: "Round of 32",
@@ -49,6 +53,11 @@ export function Bracket({
             <div className="flex flex-col gap-3">
               {roundMatches.map((match) => {
                 const picked = picks[match.id];
+                const participants = participantOptionsForMatch(
+                  matches,
+                  picks,
+                  match,
+                );
                 return (
                   <div
                     key={match.id}
@@ -57,22 +66,38 @@ export function Bracket({
                     <p className="mb-2 text-xs text-zinc-500">
                       Match {match.match_number}
                     </p>
-                    {[match.team_a, match.team_b].map((slug) => {
-                      const selected = picked === slug;
+                    {participants.map((participant) => {
+                      const selected = picked === participant.value;
+                      const disabled = locked || !participant.value;
                       return (
                         <button
-                          key={slug}
+                          key={participant.slot}
                           type="button"
-                          disabled={locked}
-                          onClick={() => onPick(match.id, slug)}
+                          disabled={disabled}
+                          onClick={() => {
+                            if (participant.value) {
+                              onPick(match.id, participant.value);
+                            }
+                          }}
                           className={`mb-1 w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
                             selected
                               ? "border-emerald-500 bg-emerald-50 font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
                               : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-500"
-                          } ${locked ? "cursor-default opacity-80" : "cursor-pointer"}`}
+                          } ${disabled ? "cursor-default opacity-70" : "cursor-pointer"}`}
                         >
-                          <TeamLabel slug={slug} flagSize={22} />
-                          {match.winner === slug && (
+                          {participant.value ? (
+                            <TeamLabel slug={participant.value} flagSize={22} />
+                          ) : (
+                            <span className="text-zinc-500">
+                              {participantName(participant.slot)}
+                            </span>
+                          )}
+                          {participant.slotLabel && participant.value && (
+                            <span className="ml-2 text-xs text-zinc-400">
+                              {participant.slotLabel}
+                            </span>
+                          )}
+                          {match.winner === participant.value && (
                             <span className="ml-2 text-xs text-emerald-600">
                               (actual)
                             </span>

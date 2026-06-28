@@ -3,6 +3,7 @@ import { fetchSettings, getEffectiveLocks } from "@/lib/locks";
 import {
   computeMaxRemainingGroupPoints,
   computeMaxRemainingKnockoutPoints,
+  countValidKnockoutPicks,
   groupPickToRanking,
   scoreGroupPicks,
   scoreKnockoutPicks,
@@ -59,7 +60,10 @@ export async function GET() {
         tiebreakers.find((t) => t.user_id === user.id)?.total_goals ?? null;
       const groupSavedCount = userGroupPicks.length;
       const groupsComplete = groupSavedCount === GROUP_CODES.length;
-      const knockoutPickCount = userKnockoutPicks.length;
+      const knockoutPickCount = countValidKnockoutPicks(
+        userKnockoutPicks,
+        matches,
+      );
       const knockoutRequiredCount = matches.length;
       const tiebreakerComplete = tiebreaker !== null;
       const knockoutComplete =

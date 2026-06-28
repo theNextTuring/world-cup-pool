@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bracket } from "@/components/Bracket";
 import { SaveIndicator } from "@/components/SaveIndicator";
+import { validPickCount } from "@/lib/bracket";
 import { formatDeadlineET } from "@/lib/dates";
 import type { KnockoutMatch } from "@/lib/supabase";
 
@@ -48,7 +49,12 @@ export default function KnockoutPage() {
 
         if (settingsRes.ok) {
           setLocked(settingsData.locks.knockoutStageLocked);
-          setPublished(settingsData.locks.knockoutBracketPublished);
+          setPublished(
+            Boolean(
+              data.locks?.knockoutBracketPublished ||
+                settingsData.locks.knockoutBracketPublished,
+            ),
+          );
           setDeadline(settingsData.locks.knockoutDeadline);
         }
       } finally {
@@ -135,7 +141,7 @@ export default function KnockoutPage() {
     );
   }
 
-  const pickedCount = Object.keys(picks).length;
+  const pickedCount = validPickCount(matches, picks);
   const complete = pickedCount === matches.length && tiebreaker !== "";
 
   return (

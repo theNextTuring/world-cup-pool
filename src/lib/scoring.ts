@@ -5,6 +5,10 @@ import type {
   KnockoutMatch,
   KnockoutPick,
 } from "./supabase";
+import {
+  participantOptionsForMatch,
+  validPickCount,
+} from "./bracket";
 
 export const GROUP_POINTS = [1, 1, 1, 1] as const;
 
@@ -158,6 +162,11 @@ export function computeMaxRemainingKnockoutPoints(
   const pickByMatch = Object.fromEntries(
     picks.map((p) => [p.match_id, p.picked_winner]),
   );
+  const actualWinnerSelections = Object.fromEntries(
+    matches.flatMap((candidate) =>
+      candidate.winner ? [[candidate.id, candidate.winner]] : [],
+    ),
+  );
 
   let remaining = 0;
   for (const match of matches) {
@@ -167,8 +176,14 @@ export function computeMaxRemainingKnockoutPoints(
       remaining += scoring.knockoutPoints[match.round];
       continue;
     }
+    const options = participantOptionsForMatch(
+      matches,
+      actualWinnerSelections,
+      match,
+    );
     const couldStillWin =
-      picked === match.team_a || picked === match.team_b;
+      options.some((option) => option.value === picked) ||
+      options.some((option) => option.value === null);
     if (couldStillWin) {
       remaining += scoring.knockoutPoints[match.round];
     }
@@ -230,6 +245,16 @@ export type LeaderboardEntry = {
   maxRemaining: number;
   groupPredictions?: GroupPickRanking[];
 };
+
+export function countValidKnockoutPicks(
+  picks: KnockoutPick[],
+  matches: KnockoutMatch[],
+): number {
+  const selections = Object.fromEntries(
+    picks.map((pick) => [pick.match_id, pick.picked_winner]),
+  );
+  return validPickCount(matches, selections);
+}
 
 export function sortLeaderboard(
   entries: LeaderboardEntry[],

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  isSelectionValid,
+  participantOptionsForMatch,
+} from "@/lib/bracket";
 import { fetchSettings, getEffectiveLocks } from "@/lib/locks";
+import { ensureOfficialKnockoutBracket } from "@/lib/officialBracket";
 import { getSessionUserId, unauthorized } from "@/lib/session";
 import { createServiceClient } from "@/lib/supabase";
 
@@ -9,27 +14,23 @@ export async function GET() {
     if (!userId) return unauthorized();
 
     const supabase = createServiceClient();
-    const [picksRes, tiebreakerRes, matchesRes, settings] = await Promise.all([
+    const [picksRes, tiebreakerRes] = await Promise.all([
       supabase.from("knockout_picks").select("*").eq("user_id", userId),
       supabase
         .from("tiebreaker_predictions")
         .select("*")
         .eq("user_id", userId)
         .maybeSingle(),
-      supabase
-        .from("knockout_matches")
-        .select("*")
-        .order("round")
-        .order("match_number"),
-      fetchSettings(supabase),
     ]);
+    const matches = await ensureOfficialKnockoutBracket(supabase);
+    const settings = await fetchSettings(supabase);
 
     const locks = getEffectiveLocks(settings);
 
     return NextResponse.json({
       picks: picksRes.data ?? [],
       tiebreaker: tiebreakerRes.data ?? null,
-      matches: matchesRes.data ?? [],
+      matches,
       locks,
     });
   } catch (error) {
@@ -71,17 +72,34 @@ export async function PUT(request: Request) {
       );
     }
 
-    const { data: match } = await supabase
+    const { data: matches } = await supabase
       .from("knockout_matches")
       .select("*")
-      .eq("id", matchId)
-      .single();
+      .order("match_number");
 
+    const match = (matches ?? []).find((candidate) => candidate.id === matchId);
     if (!match) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
     }
 
-    if (pickedWinner !== match.team_a && pickedWinner !== match.team_b) {
+    const { data: existingPicks } = await supabase
+      .from("knockout_picks")
+      .select("*")
+      .eq("user_id", userId);
+    const selections = Object.fromEntries(
+      (existingPicks ?? []).map((pick) => [pick.match_id, pick.picked_winner]),
+    );
+    selections[matchId] = pickedWinner;
+
+    const options = participantOptionsForMatch(matches ?? [], selections, match);
+    if (!options.every((option) => option.value)) {
+      return NextResponse.json(
+        { error: "Pick the earlier source matches first" },
+        { status: 400 },
+      );
+    }
+
+    if (!isSelectionValid(matches ?? [], selections, match)) {
       return NextResponse.json({ error: "Invalid winner pick" }, { status: 400 });
     }
 

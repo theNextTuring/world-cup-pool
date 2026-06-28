@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { adminUnauthorized, isAdminAuthenticated } from "@/lib/admin";
+import {
+  isWinnerSlot,
+  matchWinnerMap,
+  participantOptionsForMatch,
+} from "@/lib/bracket";
+import { ensureOfficialKnockoutBracket } from "@/lib/officialBracket";
 import type { KnockoutRound } from "@/lib/supabase";
 import { createServiceClient } from "@/lib/supabase";
 
@@ -17,17 +23,9 @@ export async function GET() {
 
   try {
     const supabase = createServiceClient();
-    const { data, error } = await supabase
-      .from("knockout_matches")
-      .select("*")
-      .order("round")
-      .order("match_number");
+    const data = await ensureOfficialKnockoutBracket(supabase);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ matches: data ?? [] });
+    return NextResponse.json({ matches: data });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Server error" },
@@ -85,8 +83,20 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+      if (round === "r32" && (isWinnerSlot(teamA) || isWinnerSlot(teamB))) {
+        return NextResponse.json(
+          { error: `Round of 32 teams must be actual teams at index ${index}` },
+          { status: 400 },
+        );
+      }
       const winner = match.winner ? String(match.winner) : null;
-      if (winner && winner !== teamA && winner !== teamB) {
+      if (
+        winner &&
+        !isWinnerSlot(teamA) &&
+        !isWinnerSlot(teamB) &&
+        winner !== teamA &&
+        winner !== teamB
+      ) {
         return NextResponse.json(
           { error: `Invalid winner at index ${index}` },
           { status: 400 },
@@ -117,6 +127,34 @@ export async function POST(request: Request) {
       if (matchNumbers.size !== roundRows.length) {
         return NextResponse.json(
           { error: `${round.toUpperCase()} match numbers must be unique` },
+          { status: 400 },
+        );
+      }
+    }
+
+    const allMatchNumbers = new Set(rows.map((row) => row.match_number));
+    if (allMatchNumbers.size !== rows.length) {
+      return NextResponse.json(
+        { error: "Match numbers must be unique across the bracket" },
+        { status: 400 },
+      );
+    }
+
+    const draftMatches = rows.map((row) => ({
+      id: `draft-${row.match_number}`,
+      ...row,
+    }));
+    const draftWinners = matchWinnerMap(draftMatches);
+    for (const match of draftMatches) {
+      if (!match.winner) continue;
+      const validWinners = participantOptionsForMatch(
+        draftMatches,
+        draftWinners,
+        match,
+      ).flatMap((option) => (option.value ? [option.value] : []));
+      if (!validWinners.includes(match.winner)) {
+        return NextResponse.json(
+          { error: `Invalid winner for match ${match.match_number}` },
           { status: 400 },
         );
       }
@@ -168,16 +206,24 @@ export async function PATCH(request: Request) {
     const supabase = createServiceClient();
 
     if (winner) {
-      const { data: match } = await supabase
+      const { data: matches } = await supabase
         .from("knockout_matches")
         .select("*")
-        .eq("id", matchId)
-        .single();
+        .order("match_number");
+      const match = (matches ?? []).find((candidate) => candidate.id === matchId);
 
       if (!match) {
         return NextResponse.json({ error: "Match not found" }, { status: 404 });
       }
-      if (winner !== match.team_a && winner !== match.team_b) {
+      const options = participantOptionsForMatch(
+        matches ?? [],
+        matchWinnerMap(matches ?? []),
+        match,
+      );
+      const validWinners = options.flatMap((option) =>
+        option.value ? [option.value] : [],
+      );
+      if (!validWinners.includes(winner)) {
         return NextResponse.json({ error: "Invalid winner" }, { status: 400 });
       }
     }

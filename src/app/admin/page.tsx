@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { formatDeadlineET } from "@/lib/dates";
 import type { KnockoutMatch } from "@/lib/supabase";
 import { TeamLabel } from "@/components/TeamLabel";
+import {
+  matchWinnerMap,
+  OFFICIAL_FUTURE_KNOCKOUT_MATCHES,
+  OFFICIAL_R32_MATCH_SLOTS,
+  participantName,
+  participantOptionsForMatch,
+} from "@/lib/bracket";
 import { GROUPS, teamName, teamsForGroup } from "@/lib/teams";
 
 type PoolUser = {
@@ -61,6 +68,14 @@ const EXPECTED_BRACKET_MATCHES = Object.values(ROUND_REQUIREMENTS).reduce(
   0,
 );
 
+function ParticipantLabel({ value }: { value: string }) {
+  if (value.startsWith("winner:")) {
+    return <span className="text-zinc-500">{participantName(value)}</span>;
+  }
+
+  return <TeamLabel slug={value} flagSize={18} />;
+}
+
 type ScoringField = {
   key: keyof Pick<
     AppSettings,
@@ -108,7 +123,7 @@ export default function AdminPage() {
   const [matches, setMatches] = useState<KnockoutMatch[]>([]);
   const [newMatch, setNewMatch] = useState({
     round: "r32",
-    matchNumber: 1,
+    matchNumber: 73,
     teamA: "",
     teamB: "",
   });
@@ -143,6 +158,11 @@ export default function AdminPage() {
       if (matchNumbers.size !== roundMatches.length) {
         errors.push(`${label}: duplicate match numbers`);
       }
+    }
+
+    const allMatchNumbers = new Set(matches.map((match) => match.match_number));
+    if (allMatchNumbers.size !== matches.length) {
+      errors.push("Match numbers must be unique across the bracket");
     }
 
     return errors;
@@ -316,9 +336,30 @@ export default function AdminPage() {
   ) {
     setStandings((prev) => {
       const next = [...prev[groupCode]];
+      const existingIndex = next.indexOf(slug);
+      if (existingIndex >= 0 && existingIndex !== index) {
+        next[existingIndex] = next[index];
+      }
       next[index] = slug;
       return { ...prev, [groupCode]: next };
     });
+  }
+
+  function fillOfficialFutureRounds() {
+    setMatches((prev) => [
+      ...prev.filter((match) => match.round === "r32"),
+      ...OFFICIAL_FUTURE_KNOCKOUT_MATCHES.map((match) => ({
+        id: crypto.randomUUID(),
+        round: match.round,
+        match_number: match.matchNumber,
+        team_a: match.teamA,
+        team_b: match.teamB,
+        winner: null,
+      })),
+    ]);
+    setMessage(
+      "Loaded the official FIFA future-round bracket paths. Add the 16 Round of 32 matches, then save.",
+    );
   }
 
   function addMatchToDraft() {
@@ -668,8 +709,9 @@ export default function AdminPage() {
       <section className="space-y-4 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
         <h2 className="text-lg font-semibold">Knockout Bracket Builder</h2>
         <p className="text-sm text-zinc-500">
-          Add matches, save the full bracket, then enter winners as results come
-          in. ({matches.length}/{EXPECTED_BRACKET_MATCHES} matches drafted)
+          Add the 16 Round of 32 matches, load the official future-round paths,
+          save the full bracket, then enter winners as results come in. (
+          {matches.length}/{EXPECTED_BRACKET_MATCHES} matches drafted)
         </p>
         <div
           className={`rounded-xl border px-3 py-2 text-sm ${
@@ -687,6 +729,32 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={fillOfficialFutureRounds}
+            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
+          >
+            Load official future rounds
+          </button>
+        </div>
+
+        <details className="rounded-xl border border-zinc-200 p-3 text-sm dark:border-zinc-700">
+          <summary className="cursor-pointer font-medium">
+            Official Round of 32 match slots
+          </summary>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {OFFICIAL_R32_MATCH_SLOTS.map((slot) => (
+              <div key={slot.matchNumber} className="text-zinc-600 dark:text-zinc-400">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                  Match {slot.matchNumber}:
+                </span>{" "}
+                {slot.teamA} vs {slot.teamB}
+              </div>
+            ))}
+          </div>
+        </details>
 
         <div className="grid gap-2 md:grid-cols-5">
           <select
@@ -761,24 +829,49 @@ export default function AdminPage() {
                 {match.round.toUpperCase()} #{match.match_number}
               </span>
               <span className="flex flex-wrap items-center gap-2">
-                <TeamLabel slug={match.team_a} flagSize={18} />
+                <ParticipantLabel value={match.team_a} />
                 <span className="text-zinc-400">vs</span>
-                <TeamLabel slug={match.team_b} flagSize={18} />
+                <ParticipantLabel value={match.team_b} />
               </span>
-              <select
-                className="rounded border px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-                value={match.winner ?? ""}
-                onChange={(e) =>
-                  setMatchWinner(
-                    match.id,
-                    e.target.value ? e.target.value : null,
-                  )
-                }
-              >
-                <option value="">No winner yet</option>
-                <option value={match.team_a}>{teamName(match.team_a)}</option>
-                <option value={match.team_b}>{teamName(match.team_b)}</option>
-              </select>
+              {(() => {
+                const winnerOptions = participantOptionsForMatch(
+                  matches,
+                  matchWinnerMap(matches),
+                  match,
+                ).flatMap((option) =>
+                  option.value
+                    ? [
+                        {
+                          value: option.value,
+                          label: option.slotLabel
+                            ? `${teamName(option.value)} (${option.slotLabel})`
+                            : teamName(option.value),
+                        },
+                      ]
+                    : [],
+                );
+
+                return (
+                  <select
+                    className="rounded border px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                    value={match.winner ?? ""}
+                    disabled={winnerOptions.length < 2}
+                    onChange={(e) =>
+                      setMatchWinner(
+                        match.id,
+                        e.target.value ? e.target.value : null,
+                      )
+                    }
+                  >
+                    <option value="">No winner yet</option>
+                    {winnerOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
               <button
                 type="button"
                 className="text-red-600"
