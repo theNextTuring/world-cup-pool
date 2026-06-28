@@ -73,7 +73,7 @@ export async function GET() {
         userKnockoutPicks.map((pick) => [pick.match_id, pick.picked_winner]),
       );
       const tiebreaker =
-        tiebreakers.find((t) => t.user_id === user.id)?.total_goals ?? null;
+        tiebreakers.find((t) => t.user_id === user.id)?.total_goals ?? 0;
       const groupSavedCount = userGroupPicks.length;
       const groupsComplete = groupSavedCount === GROUP_CODES.length;
       const knockoutPickCount = countValidKnockoutPicks(
@@ -81,7 +81,7 @@ export async function GET() {
         matches,
       );
       const knockoutRequiredCount = matches.length;
-      const tiebreakerComplete = tiebreaker !== null;
+      const tiebreakerComplete = true;
       const knockoutComplete =
         locks.knockoutBracketPublished &&
         knockoutRequiredCount > 0 &&
