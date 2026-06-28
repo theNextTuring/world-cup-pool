@@ -10,6 +10,7 @@ import {
   scoreKnockoutPicks,
   scoringFromSettings,
   sortLeaderboard,
+  standingToRanks,
   tiebreakerDistance,
   type LeaderboardEntry,
 } from "@/lib/scoring";
@@ -51,6 +52,9 @@ export async function GET() {
     const matches = matchesRes.data ?? [];
     const tiebreakers = tiebreakersRes.data ?? [];
     const actualGoals = locks.actualTotalKnockoutGoals;
+    const standingsByGroup = Object.fromEntries(
+      standings.map((standing) => [standing.group_code, standing]),
+    );
 
     const entries: LeaderboardEntry[] = users.map((user) => {
       const userGroupPicks = groupPicks
@@ -110,7 +114,18 @@ export async function GET() {
         tiebreaker,
         tiebreakerDistance: tiebreakerDistance(tiebreaker, actualGoals),
         maxRemaining,
-        groupPredictions: scoresVisible ? userGroupPicks : undefined,
+        groupPredictions: scoresVisible
+          ? userGroupPicks.map((pick) => {
+              const standing = standingsByGroup[pick.group_code];
+              return {
+                ...pick,
+                points: standing
+                  ? scoreGroupPicks([pick], [standing], scoring)
+                  : 0,
+                actualRanks: standing ? standingToRanks(standing) : undefined,
+              };
+            })
+          : undefined,
         knockoutPredictions: knockoutPicksVisible
           ? matches
               .slice()

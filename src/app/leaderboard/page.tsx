@@ -25,6 +25,8 @@ type Entry = {
   groupPredictions?: {
     group_code: string;
     ranks: [string, string, string, string];
+    points?: number;
+    actualRanks?: [string, string, string, string];
   }[];
   knockoutPredictions?: {
     matchId: string;

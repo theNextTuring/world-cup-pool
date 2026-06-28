@@ -95,6 +95,8 @@ export const MAX_TOTAL_POINTS = maxTotalPoints(DEFAULT_SCORING);
 export type GroupPickRanking = {
   group_code: string;
   ranks: [string, string, string, string];
+  points?: number;
+  actualRanks?: [string, string, string, string];
 };
 
 export function groupPickToRanking(pick: GroupPick): GroupPickRanking {

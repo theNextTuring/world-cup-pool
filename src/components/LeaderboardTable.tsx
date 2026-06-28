@@ -8,6 +8,8 @@ import { GROUP_CODES } from "@/lib/teams";
 type GroupPrediction = {
   group_code: string;
   ranks: [string, string, string, string];
+  points?: number;
+  actualRanks?: [string, string, string, string];
 };
 
 type Entry = {
@@ -98,8 +100,8 @@ export function LeaderboardTable({
 
   function groupPredictionMap(entry: Entry) {
     return Object.fromEntries(
-      (entry.groupPredictions ?? []).map((pick) => [pick.group_code, pick.ranks]),
-    ) as Record<string, [string, string, string, string] | undefined>;
+      (entry.groupPredictions ?? []).map((pick) => [pick.group_code, pick]),
+    ) as Record<string, GroupPrediction | undefined>;
   }
 
   function participantLabel(option: KnockoutPrediction["options"][number]) {
@@ -229,7 +231,8 @@ export function LeaderboardTable({
                             </h3>
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                               {GROUP_CODES.map((groupCode) => {
-                                const ranks = predictionsByGroup[groupCode];
+                                const prediction = predictionsByGroup[groupCode];
+                                const ranks = prediction?.ranks;
 
                                 return (
                                   <div
@@ -238,21 +241,53 @@ export function LeaderboardTable({
                                   >
                                     <p className="mb-2 text-sm font-semibold">
                                       Group {groupCode}
+                                      {prediction?.points !== undefined && (
+                                        <span className="ml-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                                          {prediction.points} pts
+                                        </span>
+                                      )}
                                     </p>
                                     {ranks ? (
-                                      <ol className="space-y-1 text-sm">
-                                        {ranks.map((slug, index) => (
-                                          <li
-                                            key={slug}
-                                            className="flex items-center gap-2"
-                                          >
-                                            <span className="w-5 shrink-0 text-xs font-semibold text-zinc-500">
-                                              {index + 1}
-                                            </span>
-                                            <TeamLabel slug={slug} flagSize={18} />
-                                          </li>
-                                        ))}
-                                      </ol>
+                                      <div className="space-y-3">
+                                        <ol className="space-y-1 text-sm">
+                                          {ranks.map((slug, index) => (
+                                            <li
+                                              key={slug}
+                                              className="flex items-center gap-2"
+                                            >
+                                              <span className="w-5 shrink-0 text-xs font-semibold text-zinc-500">
+                                                {index + 1}
+                                              </span>
+                                              <TeamLabel slug={slug} flagSize={18} />
+                                            </li>
+                                          ))}
+                                        </ol>
+                                        {prediction.actualRanks && (
+                                          <div className="border-t border-zinc-200 pt-2 dark:border-zinc-800">
+                                            <p className="mb-1 text-xs font-medium text-zinc-500">
+                                              Actual
+                                            </p>
+                                            <ol className="space-y-1 text-xs">
+                                              {prediction.actualRanks.map(
+                                                (slug, index) => (
+                                                  <li
+                                                    key={slug}
+                                                    className="flex items-center gap-2"
+                                                  >
+                                                    <span className="w-5 shrink-0 font-semibold text-zinc-500">
+                                                      {index + 1}
+                                                    </span>
+                                                    <TeamLabel
+                                                      slug={slug}
+                                                      flagSize={16}
+                                                    />
+                                                  </li>
+                                                ),
+                                              )}
+                                            </ol>
+                                          </div>
+                                        )}
+                                      </div>
                                     ) : (
                                       <p className="text-sm text-zinc-500">
                                         Not saved
