@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { TeamLabel } from "@/components/TeamLabel";
+import { participantName } from "@/lib/bracket";
 import { GROUP_CODES } from "@/lib/teams";
 
 type GroupPrediction = {
@@ -28,17 +29,42 @@ type Entry = {
   tiebreaker: number | null;
   maxRemaining: number;
   groupPredictions?: GroupPrediction[];
+  knockoutPredictions?: KnockoutPrediction[];
 };
+
+type KnockoutRound = "r32" | "r16" | "qf" | "sf" | "final";
+
+type KnockoutPrediction = {
+  matchId: string;
+  round: KnockoutRound;
+  matchNumber: number;
+  pickedWinner: string | null;
+  options: {
+    slot: string;
+    slotLabel: string | null;
+    value: string | null;
+  }[];
+};
+
+const KNOCKOUT_ROUNDS: { round: KnockoutRound; label: string }[] = [
+  { round: "r32", label: "Round of 32" },
+  { round: "r16", label: "Round of 16" },
+  { round: "qf", label: "Quarterfinals" },
+  { round: "sf", label: "Semifinals" },
+  { round: "final", label: "Final" },
+];
 
 export function LeaderboardTable({
   entries,
   actualTotalGoals,
   scoresVisible,
+  knockoutPicksVisible,
   knockoutPublished,
 }: {
   entries: Entry[];
   actualTotalGoals: number | null;
   scoresVisible: boolean;
+  knockoutPicksVisible: boolean;
   knockoutPublished: boolean;
 }) {
   const [openUserId, setOpenUserId] = useState<string | null>(null);
@@ -76,6 +102,16 @@ export function LeaderboardTable({
     ) as Record<string, [string, string, string, string] | undefined>;
   }
 
+  function participantLabel(option: KnockoutPrediction["options"][number]) {
+    if (option.value) return <TeamLabel slug={option.value} flagSize={16} />;
+    return (
+      <span className="text-zinc-500">
+        {option.slotLabel ?? participantName(option.slot)}
+      </span>
+    );
+  }
+
+  const canInspectPicks = scoresVisible || knockoutPicksVisible;
   const columnCount = scoresVisible ? 9 : 6;
 
   return (
@@ -108,7 +144,7 @@ export function LeaderboardTable({
                 <tr className="border-t border-zinc-200 dark:border-zinc-800">
                   <td className="px-4 py-3 font-semibold">{entry.rank}</td>
                   <td className="px-4 py-3">
-                    {scoresVisible ? (
+                    {canInspectPicks ? (
                       <button
                         type="button"
                         onClick={() =>
@@ -121,7 +157,7 @@ export function LeaderboardTable({
                           {entry.firstName} {entry.lastName}
                         </span>
                         <span className="block text-xs text-zinc-500">
-                          {expanded ? "Hide picks" : "View group picks"}
+                          {expanded ? "Hide picks" : "View picks"}
                         </span>
                       </button>
                     ) : (
@@ -182,43 +218,105 @@ export function LeaderboardTable({
                     <td className="px-4 py-3">{entry.maxRemaining}</td>
                   )}
                 </tr>
-                {scoresVisible && expanded && (
+                {canInspectPicks && expanded && (
                   <tr className="border-t border-zinc-200 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/50">
                     <td colSpan={columnCount} className="px-4 py-4">
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {GROUP_CODES.map((groupCode) => {
-                          const ranks = predictionsByGroup[groupCode];
+                      <div className="space-y-5">
+                        {scoresVisible && (
+                          <section>
+                            <h3 className="mb-3 text-sm font-semibold">
+                              Group Picks
+                            </h3>
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                              {GROUP_CODES.map((groupCode) => {
+                                const ranks = predictionsByGroup[groupCode];
 
-                          return (
-                            <div
-                              key={groupCode}
-                              className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
-                            >
-                              <p className="mb-2 text-sm font-semibold">
-                                Group {groupCode}
-                              </p>
-                              {ranks ? (
-                                <ol className="space-y-1 text-sm">
-                                  {ranks.map((slug, index) => (
-                                    <li
-                                      key={slug}
-                                      className="flex items-center gap-2"
-                                    >
-                                      <span className="w-5 shrink-0 text-xs font-semibold text-zinc-500">
-                                        {index + 1}
-                                      </span>
-                                      <TeamLabel slug={slug} flagSize={18} />
-                                    </li>
-                                  ))}
-                                </ol>
-                              ) : (
-                                <p className="text-sm text-zinc-500">
-                                  Not saved
-                                </p>
-                              )}
+                                return (
+                                  <div
+                                    key={groupCode}
+                                    className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
+                                  >
+                                    <p className="mb-2 text-sm font-semibold">
+                                      Group {groupCode}
+                                    </p>
+                                    {ranks ? (
+                                      <ol className="space-y-1 text-sm">
+                                        {ranks.map((slug, index) => (
+                                          <li
+                                            key={slug}
+                                            className="flex items-center gap-2"
+                                          >
+                                            <span className="w-5 shrink-0 text-xs font-semibold text-zinc-500">
+                                              {index + 1}
+                                            </span>
+                                            <TeamLabel slug={slug} flagSize={18} />
+                                          </li>
+                                        ))}
+                                      </ol>
+                                    ) : (
+                                      <p className="text-sm text-zinc-500">
+                                        Not saved
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          );
-                        })}
+                          </section>
+                        )}
+
+                        {knockoutPicksVisible && (
+                          <section>
+                            <h3 className="mb-3 text-sm font-semibold">
+                              Knockout Bracket
+                            </h3>
+                            <div className="grid gap-3 lg:grid-cols-5">
+                              {KNOCKOUT_ROUNDS.map(({ round, label }) => {
+                                const roundPicks = (
+                                  entry.knockoutPredictions ?? []
+                                ).filter((pick) => pick.round === round);
+
+                                return (
+                                  <div key={round} className="space-y-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                                      {label}
+                                    </p>
+                                    {roundPicks.map((pick) => (
+                                      <div
+                                        key={pick.matchId}
+                                        className="rounded-xl border border-zinc-200 bg-white p-3 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                                      >
+                                        <p className="mb-2 font-semibold text-zinc-500">
+                                          Match {pick.matchNumber}
+                                        </p>
+                                        <div className="space-y-1">
+                                          {pick.options.map((option) => (
+                                            <div
+                                              key={option.slot}
+                                              className={`rounded-lg border px-2 py-1.5 ${
+                                                pick.pickedWinner &&
+                                                option.value === pick.pickedWinner
+                                                  ? "border-emerald-400 bg-emerald-50 font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                                                  : "border-zinc-200 text-zinc-600 dark:border-zinc-800 dark:text-zinc-400"
+                                              }`}
+                                            >
+                                              {participantLabel(option)}
+                                              {option.slotLabel && option.value && (
+                                                <span className="ml-1 text-[11px] font-normal text-zinc-400">
+                                                  {option.slotLabel}
+                                                </span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </section>
+                        )}
                       </div>
                     </td>
                   </tr>

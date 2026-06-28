@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchSettings, getEffectiveLocks } from "@/lib/locks";
+import { participantOptionsForMatch } from "@/lib/bracket";
 import {
   computeMaxRemainingGroupPoints,
   computeMaxRemainingKnockoutPoints,
@@ -22,6 +23,8 @@ export async function GET() {
     const locks = getEffectiveLocks(settings);
     const scoring = scoringFromSettings(settings);
     const scoresVisible = locks.groupStageLocked;
+    const knockoutPicksVisible =
+      locks.knockoutStageLocked && locks.knockoutBracketPublished;
 
     const [
       usersRes,
@@ -55,6 +58,9 @@ export async function GET() {
         .map(groupPickToRanking);
       const userKnockoutPicks = knockoutPicks.filter(
         (p) => p.user_id === user.id,
+      );
+      const knockoutSelections = Object.fromEntries(
+        userKnockoutPicks.map((pick) => [pick.match_id, pick.picked_winner]),
       );
       const tiebreaker =
         tiebreakers.find((t) => t.user_id === user.id)?.total_goals ?? null;
@@ -105,6 +111,26 @@ export async function GET() {
         tiebreakerDistance: tiebreakerDistance(tiebreaker, actualGoals),
         maxRemaining,
         groupPredictions: scoresVisible ? userGroupPicks : undefined,
+        knockoutPredictions: knockoutPicksVisible
+          ? matches
+              .slice()
+              .sort((a, b) => a.match_number - b.match_number)
+              .map((match) => {
+                const options = participantOptionsForMatch(
+                  matches,
+                  knockoutSelections,
+                  match,
+                );
+
+                return {
+                  matchId: match.id,
+                  round: match.round,
+                  matchNumber: match.match_number,
+                  pickedWinner: knockoutSelections[match.id] ?? null,
+                  options: [options[0], options[1]],
+                };
+              })
+          : undefined,
       };
     });
 
@@ -116,6 +142,7 @@ export async function GET() {
     return NextResponse.json({
       visible: true,
       scoresVisible,
+      knockoutPicksVisible,
       knockoutBracketPublished: locks.knockoutBracketPublished,
       actualTotalKnockoutGoals: actualGoals,
       entries: sorted,

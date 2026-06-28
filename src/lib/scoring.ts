@@ -244,6 +244,21 @@ export type LeaderboardEntry = {
   tiebreakerDistance: number | null;
   maxRemaining: number;
   groupPredictions?: GroupPickRanking[];
+  knockoutPredictions?: KnockoutPrediction[];
+};
+
+export type KnockoutPredictionOption = {
+  slot: string;
+  slotLabel: string | null;
+  value: string | null;
+};
+
+export type KnockoutPrediction = {
+  matchId: string;
+  round: KnockoutMatch["round"];
+  matchNumber: number;
+  pickedWinner: string | null;
+  options: [KnockoutPredictionOption, KnockoutPredictionOption];
 };
 
 export function countValidKnockoutPicks(

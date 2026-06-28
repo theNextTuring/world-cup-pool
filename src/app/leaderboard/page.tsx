@@ -26,6 +26,17 @@ type Entry = {
     group_code: string;
     ranks: [string, string, string, string];
   }[];
+  knockoutPredictions?: {
+    matchId: string;
+    round: "r32" | "r16" | "qf" | "sf" | "final";
+    matchNumber: number;
+    pickedWinner: string | null;
+    options: {
+      slot: string;
+      slotLabel: string | null;
+      value: string | null;
+    }[];
+  }[];
 };
 
 export default function LeaderboardPage() {
@@ -33,6 +44,7 @@ export default function LeaderboardPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [actualGoals, setActualGoals] = useState<number | null>(null);
   const [scoresVisible, setScoresVisible] = useState(false);
+  const [knockoutPicksVisible, setKnockoutPicksVisible] = useState(false);
   const [knockoutPublished, setKnockoutPublished] = useState(false);
   const [deadline, setDeadline] = useState("");
   const [loading, setLoading] = useState(true);
@@ -60,6 +72,7 @@ export default function LeaderboardPage() {
         setEntries(boardData.entries ?? []);
         setActualGoals(boardData.actualTotalKnockoutGoals ?? null);
         setScoresVisible(Boolean(boardData.scoresVisible));
+        setKnockoutPicksVisible(Boolean(boardData.knockoutPicksVisible));
         setKnockoutPublished(Boolean(boardData.knockoutBracketPublished));
       } finally {
         setLoading(false);
@@ -102,6 +115,7 @@ export default function LeaderboardPage() {
         entries={entries}
         actualTotalGoals={actualGoals}
         scoresVisible={scoresVisible}
+        knockoutPicksVisible={knockoutPicksVisible}
         knockoutPublished={knockoutPublished}
       />
     </div>
