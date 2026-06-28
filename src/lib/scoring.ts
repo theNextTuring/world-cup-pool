@@ -5,10 +5,7 @@ import type {
   KnockoutMatch,
   KnockoutPick,
 } from "./supabase";
-import {
-  participantOptionsForMatch,
-  validPickCount,
-} from "./bracket";
+import { validPickCount, winnerSlotMatchNumber } from "./bracket";
 
 export const GROUP_POINTS = [1, 1, 1, 1] as const;
 
@@ -164,33 +161,59 @@ export function computeMaxRemainingKnockoutPoints(
   const pickByMatch = Object.fromEntries(
     picks.map((p) => [p.match_id, p.picked_winner]),
   );
-  const actualWinnerSelections = Object.fromEntries(
-    matches.flatMap((candidate) =>
-      candidate.winner ? [[candidate.id, candidate.winner]] : [],
-    ),
+  const matchByNumber = new Map(
+    matches.map((match) => [match.match_number, match]),
   );
 
   let remaining = 0;
   for (const match of matches) {
     if (match.winner) continue;
     const picked = pickByMatch[match.id];
-    if (!picked) {
-      remaining += scoring.knockoutPoints[match.round];
-      continue;
-    }
-    const options = participantOptionsForMatch(
-      matches,
-      actualWinnerSelections,
-      match,
-    );
-    const couldStillWin =
-      options.some((option) => option.value === picked) ||
-      options.some((option) => option.value === null);
-    if (couldStillWin) {
+    if (
+      picked &&
+      teamCanStillReachMatch(picked, match, pickByMatch, matchByNumber)
+    ) {
       remaining += scoring.knockoutPoints[match.round];
     }
   }
   return remaining;
+}
+
+function teamCanStillReachMatch(
+  team: string,
+  match: KnockoutMatch,
+  pickByMatch: Record<string, string>,
+  matchByNumber: Map<number, KnockoutMatch>,
+): boolean {
+  return (
+    teamCanComeFromSlot(team, match.team_a, pickByMatch, matchByNumber) ||
+    teamCanComeFromSlot(team, match.team_b, pickByMatch, matchByNumber)
+  );
+}
+
+function teamCanComeFromSlot(
+  team: string,
+  slot: string,
+  pickByMatch: Record<string, string>,
+  matchByNumber: Map<number, KnockoutMatch>,
+): boolean {
+  const sourceMatchNumber = winnerSlotMatchNumber(slot);
+  if (sourceMatchNumber === null) {
+    return slot === team;
+  }
+
+  const sourceMatch = matchByNumber.get(sourceMatchNumber);
+  if (!sourceMatch) return false;
+
+  if (sourceMatch.winner) {
+    return sourceMatch.winner === team;
+  }
+
+  const pickedSourceWinner = pickByMatch[sourceMatch.id];
+  return (
+    pickedSourceWinner === team &&
+    teamCanStillReachMatch(team, sourceMatch, pickByMatch, matchByNumber)
+  );
 }
 
 export function computeMaxRemainingGroupPoints(
@@ -245,6 +268,9 @@ export type LeaderboardEntry = {
   tiebreaker: number | null;
   tiebreakerDistance: number | null;
   maxRemaining: number;
+  groupMaxPoints: number;
+  knockoutMaxPoints: number;
+  totalMaxPoints: number;
   groupPredictions?: GroupPickRanking[];
   knockoutPredictions?: KnockoutPrediction[];
 };

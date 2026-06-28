@@ -22,6 +22,9 @@ type Entry = {
   knockoutPoints: number;
   tiebreaker: number | null;
   maxRemaining: number;
+  groupMaxPoints: number;
+  knockoutMaxPoints: number;
+  totalMaxPoints: number;
   groupPredictions?: {
     group_code: string;
     ranks: [string, string, string, string];

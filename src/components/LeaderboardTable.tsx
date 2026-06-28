@@ -30,6 +30,9 @@ type Entry = {
   knockoutPoints: number;
   tiebreaker: number | null;
   maxRemaining: number;
+  groupMaxPoints: number;
+  knockoutMaxPoints: number;
+  totalMaxPoints: number;
   groupPredictions?: GroupPrediction[];
   knockoutPredictions?: KnockoutPrediction[];
 };
@@ -111,6 +114,10 @@ export function LeaderboardTable({
         {option.slotLabel ?? participantName(option.slot)}
       </span>
     );
+  }
+
+  function scoreFraction(points: number, maxPoints: number) {
+    return `${points}/${maxPoints}`;
   }
 
   const canInspectPicks = scoresVisible || knockoutPicksVisible;
@@ -202,10 +209,17 @@ export function LeaderboardTable({
                   {scoresVisible && (
                     <>
                       <td className="px-4 py-3 font-semibold">
-                        {entry.totalPoints}
+                        {scoreFraction(entry.totalPoints, entry.totalMaxPoints)}
                       </td>
-                      <td className="px-4 py-3">{entry.groupPoints}</td>
-                      <td className="px-4 py-3">{entry.knockoutPoints}</td>
+                      <td className="px-4 py-3">
+                        {scoreFraction(entry.groupPoints, entry.groupMaxPoints)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {scoreFraction(
+                          entry.knockoutPoints,
+                          entry.knockoutMaxPoints,
+                        )}
+                      </td>
                     </>
                   )}
                   <td className="px-4 py-3">
@@ -217,7 +231,16 @@ export function LeaderboardTable({
                     )}
                   </td>
                   {scoresVisible && (
-                    <td className="px-4 py-3">{entry.maxRemaining}</td>
+                    <td className="px-4 py-3">
+                      <span className="block">{entry.maxRemaining} left</span>
+                      <span className="block text-xs text-zinc-500">
+                        {scoreFraction(
+                          entry.totalPoints + entry.maxRemaining,
+                          entry.totalMaxPoints,
+                        )}{" "}
+                        max
+                      </span>
+                    </td>
                   )}
                 </tr>
                 {canInspectPicks && expanded && (

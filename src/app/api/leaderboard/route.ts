@@ -6,6 +6,9 @@ import {
   computeMaxRemainingKnockoutPoints,
   countValidKnockoutPicks,
   groupPickToRanking,
+  maxGroupPoints,
+  maxKnockoutPoints,
+  maxTotalPoints,
   scoreGroupPicks,
   scoreKnockoutPicks,
   scoringFromSettings,
@@ -23,6 +26,9 @@ export async function GET() {
     const settings = await fetchSettings(supabase);
     const locks = getEffectiveLocks(settings);
     const scoring = scoringFromSettings(settings);
+    const groupMaxPoints = maxGroupPoints(scoring);
+    const knockoutMaxPoints = maxKnockoutPoints(scoring);
+    const totalMaxPoints = maxTotalPoints(scoring);
     const scoresVisible = locks.groupStageLocked;
     const knockoutPicksVisible =
       locks.knockoutStageLocked && locks.knockoutBracketPublished;
@@ -114,6 +120,9 @@ export async function GET() {
         tiebreaker,
         tiebreakerDistance: tiebreakerDistance(tiebreaker, actualGoals),
         maxRemaining,
+        groupMaxPoints,
+        knockoutMaxPoints,
+        totalMaxPoints,
         groupPredictions: scoresVisible
           ? userGroupPicks.map((pick) => {
               const standing = standingsByGroup[pick.group_code];
